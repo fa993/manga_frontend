@@ -1,7 +1,7 @@
 # manga_frontend
 
-An app for reading manga, created by yours truly
+An app for reading manga
 
-## Getting Started
+## More Info
 
 This project is purely academic in nature.
