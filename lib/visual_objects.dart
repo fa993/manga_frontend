@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:manga_frontend/api_objects.dart';
 import 'package:transparent_image/transparent_image.dart';
 
@@ -673,6 +674,99 @@ class MangaPageChapterGrid extends StatelessWidget {
         shrinkWrap: true,
       ),
     );
+  }
+}
+
+class MangaPageCustomChapterGrid extends StatefulWidget {
+
+  final Map<int, ChapterData> chaps;
+  final Source s;
+
+  const MangaPageCustomChapterGrid({Key key, this.chaps, this.s}) : super(key: key);
+
+  @override
+  _MangaPageCustomChapterGridState createState() => _MangaPageCustomChapterGridState();
+}
+
+class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid> {
+
+  ScrollController _controller = ScrollController();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _controller,
+      child: CustomPaint(
+        painter: MangaPageCustomChapterGridPainter(
+          chaps: this.widget.chaps,
+          s: this.widget.s,
+          controller: _controller
+        ),
+        size: Size(
+          MediaQuery.of(context).size.width,
+          MediaQuery.of(context).size.height / 2
+        ),
+      ),
+    );
+  }
+}
+
+
+class MangaPageCustomChapterGridPainter extends CustomPainter {
+
+  final Paint painter = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0
+    ..color = Colors.white
+  ;
+
+  final Map<int, ChapterData> chaps;
+  final Source s;
+  final ScrollController controller;
+
+  final double radius = 2.0;
+
+  MangaPageCustomChapterGridPainter({this.chaps, this.s, this.controller});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    int rowsScrolled = (controller.offset/ (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight)).floor();
+    int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
+    int startIndex = numOfChapsPerRow * rowsScrolled;
+    int rowsThatCanBeDisplayed = n(size.height, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil();
+    double top = 0;
+    for(int i = 0; i < rowsThatCanBeDisplayed; i++){
+      if(startIndex > chaps.length){
+        break;
+      }
+      double left = 0;
+      for(int j = 0; j < numOfChapsPerRow; j++){
+        if(startIndex > chaps.length){
+          break;
+        }
+        canvas.drawRRect(RRect.fromLTRBR(
+          left, left + Widgeter.mangaPageChapterButtonWidth, top, top + Widgeter.mangaPageChapterButtonHeight, Radius.circular(radius)
+        ), painter);
+        left += Widgeter.mangaPageChapterButtonWidth + Widgeter.mangaPageChapterGridSpacingWidth;
+        startIndex++;
+      }
+      top += Widgeter.mangaPageChapterButtonHeight + Widgeter.mangaPageChapterGridSpacingHeight;
+    }
+  }
+
+  double n(double dimension, double buttonDimension, double buttonSpacing){
+    double sum = buttonDimension;
+    int i = 1;
+    while(sum < dimension){
+      sum += buttonDimension + buttonSpacing;
+      i++;
+    }
+    return (i - 1).roundToDouble();
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return true;
   }
 }
 
