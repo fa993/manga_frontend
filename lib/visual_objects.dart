@@ -866,9 +866,32 @@ class ChapterPage extends StatelessWidget {
     return Center(child: CachedNetworkImage(
       httpHeaders: headers[s.name],
       imageUrl: url,
-      placeholder: (context, x) {
-        return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
+      progressIndicatorBuilder: (context, s, pr) => Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(value: pr.progress,))),
+      errorWidget: (context, s, data) => Center(child: SizedBox(width: 30, height: 30, child: Icon(Icons.error, color: Colors.white,))),
+    ));
+  }
+}
+
+class ChapterPageFromProvider extends StatelessWidget {
+
+  final ImageProvider provider;
+
+  const ChapterPageFromProvider({Key key, this.provider}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Image(
+      image: provider,
+      loadingBuilder: (context, widget, i) {
+        return Center(
+          child: SizedBox(
+            child: CircularProgressIndicator(),
+            height: 30,
+            width: 30,
+          ),
+        );
       },
     ));
   }
 }
+

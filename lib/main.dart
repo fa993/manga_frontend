@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 import 'dart:math';
@@ -41,11 +42,27 @@ class MyApp extends StatelessWidget {
           fontFamily: DefaultTextStyle.of(context).style.fontFamily,
           backgroundColor: Colors.black),
       home: MyHomePage(title: 'Home'),
-      routes: <String, WidgetBuilder>{
-        '/search': (context) => SearchPageWidget(),
-        '/manga': (context) => MangaPageWidget(),
-        '/read': (context) => ReaderWidget(),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/search') {
+          return MaterialPageRoute(builder: (context) => SearchPageWidget());
+        } else if (settings.name == '/manga') {
+          return MaterialPageRoute(
+              builder: (context) => MangaPageWidget(
+                    current: settings.arguments as Future<CompleteManga>,
+                  ));
+        } else if (settings.name == '/read') {
+          return MaterialPageRoute(
+              builder: (context) => ReaderWidget(
+                    current: settings.arguments as Future<CompleteChapter>,
+                  ));
+        }
+        return null;
       },
+      // routes: <String, WidgetBuilder>{
+      //   '/search': (context) => SearchPageWidget(),
+      //   '/manga': (context) => MangaPageWidget(),
+      //   '/read': (context) => ReaderWidget(),
+      // },
     );
   }
 }
@@ -454,7 +471,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                             hd: _hd[index],
                           ),
                           onTap: () {
-                            Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(_hd[index].id));
+                            Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(_hd[index].id));
                           },
                         );
                       }
@@ -488,7 +505,9 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
 }
 
 class MangaPageWidget extends StatefulWidget {
-  const MangaPageWidget({Key key}) : super(key: key);
+  final Future<CompleteManga> current;
+
+  const MangaPageWidget({Key key, this.current}) : super(key: key);
 
   @override
   _MangaPageWidgetState createState() => _MangaPageWidgetState();
@@ -503,18 +522,11 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
   @override
   void initState() {
     super.initState();
+    this.widget.current.then((value) => setState(() => _mn = value));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_mn == null) {
-      Future<CompleteManga> thisOne = (ModalRoute.of(context).settings.arguments) as Future<CompleteManga>;
-      thisOne.then(
-        (value) => setState(() {
-          _mn = value;
-        }),
-      );
-    }
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       if (_sc.hasClients && !_scrolled) {
         _sc.jumpTo(min(MediaQuery.of(context).size.height / 2, _sc.position.maxScrollExtent));
@@ -589,23 +601,39 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
 }
 
 class ReaderWidget extends StatefulWidget {
-  const ReaderWidget({Key key}) : super(key: key);
+  final Future<CompleteChapter> current;
+
+  const ReaderWidget({Key key, this.current}) : super(key: key);
 
   @override
   _ReaderWidgetState createState() => _ReaderWidgetState();
 }
 
 class _ReaderWidgetState extends State<ReaderWidget> {
+
   CompleteChapter _chap;
+  Map<int, CachedNetworkImageProvider> _imgs = {};
   int _pageNumber = 0;
   TransformationController _controller = TransformationController();
 
   @override
+  void initState() {
+    super.initState();
+    this.widget.current.then((value) {
+      setState(() {
+        _chap = value;
+        // _chap.content.urls.asMap().forEach((index, element) {
+        //   Future.delayed(Duration(milliseconds: index * 500), () {
+        //     _imgs.putIfAbsent(index, () => CachedNetworkImageProvider(element, scale: 1, headers: headers[_chap.source.name]));
+        //   });
+        // });
+      });
+      // _imgs = _chap.content.urls.map((e) => CachedNetworkImageProvider(e, headers: headers[_chap.source.name])).toList();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Future<CompleteChapter> thisOne = (ModalRoute.of(context).settings.arguments) as Future<CompleteChapter>;
-    thisOne.then((value) => setState(() {
-          _chap = value;
-        }));
     if (_chap != null) {
       // for(int i = 0; i < _chap.urls.length; i++){
       //   _screen.add(SizedBox());
@@ -614,26 +642,40 @@ class _ReaderWidgetState extends State<ReaderWidget> {
       // for (int i = 0; i < _chap.urls.length; i++) {
       //   _screen.add(ChapterPage(url: _chap.urls[i]));
       // }
+      // return Scaffold(
+      //     backgroundColor: Colors.black,
+      //     body: GestureDetector(
+      //         onTap: () {
+      //           // loadAndReplace(_pageNumber + 1);
+      //           increment(1);
+      //         },
+      //         onHorizontalDragEnd: (t) {
+      //           if (t.velocity.pixelsPerSecond.dx > 0) {
+      //             increment(-1);
+      //           } else {
+      //             increment(1);
+      //           }
+      //         },
+      //         child: InteractiveViewer(
+      //           transformationController: _controller,
+      //             child: ChapterPage(
+      //           url: _chap.content.urls[_pageNumber],
+      //           s: _chap.source,
+      //         ))));
       return Scaffold(
-          backgroundColor: Colors.black,
-          body: GestureDetector(
-              onTap: () {
-                // loadAndReplace(_pageNumber + 1);
-                increment(1);
-              },
-              onHorizontalDragEnd: (t) {
-                if (t.velocity.pixelsPerSecond.dx > 0) {
-                  increment(-1);
-                } else {
-                  increment(1);
-                }
-              },
-              child: InteractiveViewer(
-                transformationController: _controller,
-                  child: ChapterPage(
-                url: _chap.content.urls[_pageNumber],
-                s: _chap.source,
-              ))));
+        backgroundColor: Colors.black,
+        // body: PageView.builder(
+        //   allowImplicitScrolling: true,
+        //   itemBuilder: (context, index) {
+        //     return ChapterPage(url: _chap.content.urls[index], s: _chap.source);
+        //   },
+        //   itemCount: _chap.content.urls.length,
+        // ),
+        body: PageView(
+          allowImplicitScrolling: true,
+          children: _chap.content.urls.map((value) => ChapterPage(url: value, s: _chap.source)).toList(),
+        ),
+      );
     } else {
       return Center(
           child: SizedBox(
