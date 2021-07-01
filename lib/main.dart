@@ -476,7 +476,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         );
                       }
                     },
-                    childCount: _isLoading ? _hd.length + 1 : _hd.length,
+                    childCount: _finished ? _hd.length : _hd.length + 1,
                   ),
                 ),
                 // SliverFillRemaining(

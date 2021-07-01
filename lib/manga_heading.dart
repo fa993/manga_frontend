@@ -37,7 +37,6 @@ class MangaHeading extends HiveObject {
   }
 
   @override
-  // TODO: implement hashCode
   int get hashCode => this.id.hashCode;
 
   @override

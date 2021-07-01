@@ -518,6 +518,7 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   static double mangaPageChapterPanelExpansionButtonHeight = 14.0;
 
   static int _expandedIndex = -1;
+
   // double _gridHeight = 0;
 
   void switchDisplayMode() {
@@ -530,7 +531,6 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
     });
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -541,10 +541,10 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
     // );
   }
 
-  double n(double dimension, double buttonDimension, double buttonSpacing){
+  double n(double dimension, double buttonDimension, double buttonSpacing) {
     double sum = buttonDimension;
     int i = 1;
-    while(sum < dimension){
+    while (sum < dimension) {
       sum += buttonDimension + buttonSpacing;
       i++;
     }
@@ -569,7 +569,7 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
             },
           ),
         ),
-        this.widget.expandedIndex == _expandedIndex ? MangaPageChapterGrid(chaps: this.widget.chaps, s: this.widget.s) : MangaPageChapterList(chaps: this.widget.chaps, s: this.widget.s),
+        this.widget.expandedIndex == _expandedIndex ? MangaPageCustomChapterGrid(chaps: this.widget.chaps, s: this.widget.s) : MangaPageChapterList(chaps: this.widget.chaps, s: this.widget.s),
       ],
     );
   }
@@ -642,7 +642,6 @@ class MangaPageChapterList extends StatelessWidget {
 }
 
 class MangaPageChapterGrid extends StatelessWidget {
-
   final Map<int, ChapterData> chaps;
   final Source s;
 
@@ -678,7 +677,6 @@ class MangaPageChapterGrid extends StatelessWidget {
 }
 
 class MangaPageCustomChapterGrid extends StatefulWidget {
-
   final Map<int, ChapterData> chaps;
   final Source s;
 
@@ -689,36 +687,93 @@ class MangaPageCustomChapterGrid extends StatefulWidget {
 }
 
 class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid> {
-
   ScrollController _controller = ScrollController();
+  int numOfChapsPerRow;
+  int numOfRows;
+  double leftOffsetMain;
+
+
+  @override
+  void initState() {
+    super.initState();
+
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    double w = MediaQuery.of(context).size.width;
+    numOfChapsPerRow = n(w, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
+    leftOffsetMain = (w - (numOfChapsPerRow * Widgeter.mangaPageChapterButtonWidth + (numOfChapsPerRow - 1) * Widgeter.mangaPageChapterGridSpacingWidth)) / 2;
+    numOfRows = (this.widget.chaps.length / numOfChapsPerRow).ceil();
+  }
+
+  void figureOutWhichChapterWasClicked(BuildContext context, TapUpDetails deets){
+    double actY = _controller.offset + deets.localPosition.dy;
+    double actX = deets.localPosition.dx;
+    int colNum = discountHitTest(actY, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight, 0, numOfRows);
+    int rowNum = discountHitTest(actX, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth, leftOffsetMain, numOfChapsPerRow);
+    if(colNum < 0 || rowNum < 0){
+      print("No chap clicked");
+    } else {
+      print("Chap Clicked: " + ((colNum * numOfChapsPerRow) + rowNum + 1).toString());
+      MangaPageChapterButton._onChapterPress.call(context, this.widget.chaps[((colNum * numOfChapsPerRow) + rowNum)].id, this.widget.s);
+    }
+  }
+
+  int discountHitTest(double offsetClicked, double buttonDimension, double buttonGap, double mainOffset, int numOfGroups){
+    double sum = buttonDimension + mainOffset;
+    for(int i = 0; i < numOfGroups; i++){
+      if(offsetClicked > sum - buttonDimension && offsetClicked < sum){
+        return i;
+      }
+      sum += buttonDimension + buttonGap;
+    }
+    return -1;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      controller: _controller,
-      child: CustomPaint(
-        painter: MangaPageCustomChapterGridPainter(
-          chaps: this.widget.chaps,
-          s: this.widget.s,
-          controller: _controller
-        ),
-        size: Size(
-          MediaQuery.of(context).size.width,
-          MediaQuery.of(context).size.height / 2
+    double h = MediaQuery.of(context).size.height / 2;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: h,
+      ),
+      child: GestureDetector(
+        onTapUp: (t) => figureOutWhichChapterWasClicked(context, t),
+        child: SingleChildScrollView(
+          controller: _controller,
+          child: CustomPaint(
+            painter: MangaPageCustomChapterGridPainter(chaps: this.widget.chaps, s: this.widget.s, controller: _controller, numOfChapsPerRow: this.numOfChapsPerRow, numOfRows: numOfRows, leftOffsetMain: this.leftOffsetMain, viewportHeight: h),
+            size: Size(MediaQuery.of(context).size.width, numOfRows * (Widgeter.mangaPageChapterButtonHeight + Widgeter.mangaPageChapterGridSpacingHeight)),
+          ),
         ),
       ),
     );
   }
+
+  double n(double dimension, double buttonDimension, double buttonSpacing) {
+    double sum = buttonDimension;
+    int i = 1;
+    while (sum < dimension) {
+      sum += buttonDimension + buttonSpacing;
+      i++;
+    }
+    return (i - 1).roundToDouble();
+  }
 }
 
-
 class MangaPageCustomChapterGridPainter extends CustomPainter {
-
   final Paint painter = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.0
-    ..color = Colors.white
-  ;
+    ..color = Colors.white;
+
+  final int numOfChapsPerRow;
+  final int numOfRows;
+  final double leftOffsetMain;
+
+  final double viewportHeight;
 
   final Map<int, ChapterData> chaps;
   final Source s;
@@ -726,27 +781,43 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 
   final double radius = 2.0;
 
-  MangaPageCustomChapterGridPainter({this.chaps, this.s, this.controller});
+  final TextStyle style = TextStyle(
+    color: Colors.white,
+  );
+
+  final double chapterButtonPaddingX = 5.0;
+  final double chapterButtonPaddingY = 5.0;
+
+  MangaPageCustomChapterGridPainter({this.chaps, this.s, this.controller, this.numOfChapsPerRow, this.numOfRows, this.leftOffsetMain, this.viewportHeight});
 
   @override
   void paint(Canvas canvas, Size size) {
     int rowsScrolled = (controller.offset/ (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight)).floor();
-    int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
+    // int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
     int startIndex = numOfChapsPerRow * rowsScrolled;
-    int rowsThatCanBeDisplayed = n(size.height, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil();
-    double top = 0;
-    for(int i = 0; i < rowsThatCanBeDisplayed; i++){
-      if(startIndex > chaps.length){
+    int rowsThatCanBeDisplayed = n(viewportHeight, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil() + 1;
+    // double leftOffsetMain = (size.width - (numOfChapsPerRow * Widgeter.mangaPageChapterButtonWidth + (numOfChapsPerRow - 1) * Widgeter.mangaPageChapterGridSpacingWidth)) / 2;
+    // int startIndex = 0;
+    double offsetAtThatRow = rowsScrolled * (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight);
+    double top = offsetAtThatRow;
+    for (int i = 0; i < rowsThatCanBeDisplayed; i++) {
+      if (startIndex >= chaps.length) {
         break;
       }
-      double left = 0;
-      for(int j = 0; j < numOfChapsPerRow; j++){
-        if(startIndex > chaps.length){
+      double left = leftOffsetMain;
+      for (int j = 0; j < numOfChapsPerRow; j++) {
+        if (startIndex >= chaps.length) {
           break;
         }
-        canvas.drawRRect(RRect.fromLTRBR(
-          left, left + Widgeter.mangaPageChapterButtonWidth, top, top + Widgeter.mangaPageChapterButtonHeight, Radius.circular(radius)
-        ), painter);
+        canvas.drawRRect(RRect.fromLTRBR(left, top, left + Widgeter.mangaPageChapterButtonWidth, top + Widgeter.mangaPageChapterButtonHeight, Radius.circular(radius)), painter);
+        TextPainter num = TextPainter(
+          text: TextSpan(text: chaps[startIndex].chapterNumber == null || chaps[startIndex].chapterNumber.isEmpty ? chaps[startIndex].chapterName : chaps[startIndex].chapterNumber, style: style),
+          maxLines: 1,
+          ellipsis: "...",
+          textDirection: TextDirection.ltr,
+        )
+          ..layout(maxWidth: Widgeter.mangaPageChapterButtonWidth - (chapterButtonPaddingX * 2))
+          ..paint(canvas, Offset(left + chapterButtonPaddingX, top + chapterButtonPaddingY));
         left += Widgeter.mangaPageChapterButtonWidth + Widgeter.mangaPageChapterGridSpacingWidth;
         startIndex++;
       }
@@ -754,19 +825,19 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
     }
   }
 
-  double n(double dimension, double buttonDimension, double buttonSpacing){
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return false;
+  }
+
+  double n(double dimension, double buttonDimension, double buttonSpacing) {
     double sum = buttonDimension;
     int i = 1;
-    while(sum < dimension){
+    while (sum < dimension) {
       sum += buttonDimension + buttonSpacing;
       i++;
     }
     return (i - 1).roundToDouble();
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) {
-    return true;
   }
 }
 
@@ -863,24 +934,38 @@ class ChapterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: CachedNetworkImage(
+    return Center(
+        child: CachedNetworkImage(
       httpHeaders: headers[s.name],
       imageUrl: url,
-      progressIndicatorBuilder: (context, s, pr) => Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(value: pr.progress,))),
-      errorWidget: (context, s, data) => Center(child: SizedBox(width: 30, height: 30, child: Icon(Icons.error, color: Colors.white,))),
+      progressIndicatorBuilder: (context, s, pr) => Center(
+          child: SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                value: pr.progress,
+              ))),
+      errorWidget: (context, s, data) => Center(
+          child: SizedBox(
+              width: 30,
+              height: 30,
+              child: Icon(
+                Icons.error,
+                color: Colors.white,
+              ))),
     ));
   }
 }
 
 class ChapterPageFromProvider extends StatelessWidget {
-
   final ImageProvider provider;
 
   const ChapterPageFromProvider({Key key, this.provider}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Image(
+    return Center(
+        child: Image(
       image: provider,
       loadingBuilder: (context, widget, i) {
         return Center(
@@ -894,4 +979,3 @@ class ChapterPageFromProvider extends StatelessWidget {
     ));
   }
 }
-
