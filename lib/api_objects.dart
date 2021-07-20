@@ -1,7 +1,5 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -13,13 +11,13 @@ import 'package:uuid/uuid.dart' as uuid;
 import 'manga_heading.dart';
 
 class APIer {
-  static String serverURl = "https://192.168.1.65:8080";
-  static String serverMapping = "/public/manga";
+  static String _serverURl = "https://192.168.29.227:8080";
+  static String _serverMapping = "/public/manga";
 
   static http.Client _cli = new http.Client();
 
   static Future<List<IndexedMangaHeading>> fetchFavourites() async {
-    final response = await _cli.get(Uri.parse(serverURl + serverMapping + "/favourites"));
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/favourites"));
     if (response.statusCode == HttpStatus.ok) {
       return await compute(doParseFavourites, response.body);
     } else {
@@ -32,7 +30,7 @@ class APIer {
   }
 
   static Future<List<MangaHeading>> fetchHome(int offset, [int limit = 10]) async {
-    final response = await _cli.get(Uri.parse(serverURl + serverMapping + "/home?limit=" + limit.toString() + "&offset=" + offset.toString()));
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/home?limit=" + limit.toString() + "&offset=" + offset.toString()));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status Code: " + response.statusCode.toString());
     }
@@ -40,7 +38,7 @@ class APIer {
   }
 
   static Future<MangaHeading> fetchTest() async {
-    final response = await _cli.get(Uri.parse(serverURl + serverMapping + "/thumbnail"));
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/thumbnail"));
     if (response.statusCode == HttpStatus.ok) {
       return MangaHeading.fromJSON(jsonDecode(response.body));
     } else {
@@ -49,7 +47,7 @@ class APIer {
   }
 
   static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async {
-    final response = await _cli.post(Uri.parse(serverURl + serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
+    final response = await _cli.post(Uri.parse(_serverURl + _serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -58,12 +56,12 @@ class APIer {
     }
   }
 
-  static MangaQueryResponse doParseSearch(String response){
+  static MangaQueryResponse doParseSearch(String response) {
     return MangaQueryResponse.fromJSON(jsonDecode(response));
   }
 
   static Future<CompleteManga> fetchManga(String id) async {
-    final response = await _cli.get(Uri.parse(serverURl + serverMapping + "/" + id));
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/" + id));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -72,17 +70,28 @@ class APIer {
     }
   }
 
-  static CompleteManga doParseManga(String response){
+  static CompleteManga doParseManga(String response) {
     return CompleteManga.fromJSON(jsonDecode(response));
   }
 
   static Future<ChapterContent> fetchChapter(String id) async {
-    final response = await _cli.get(Uri.parse(serverURl + serverMapping + "/chapter/" + id));
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/chapter/" + id));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
+      // return compute(doParseManga, response.body);
       return ChapterContent.fromJSON(jsonDecode(response.body));
-      // return compute(doParseChapter, response.body);
+    }
+  }
+
+  static Future<ChapterContent> fetchChapterOpt(String id) async {
+    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/chapter/" + id));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception("Failed Status code: " + response.statusCode.toString());
+    } else {
+      return SchedulerBinding.instance.scheduleTask(() {
+        return doParseChapter(response.body);
+      }, Priority.animation);
     }
   }
 
@@ -319,7 +328,7 @@ class ChapterData {
   ChapterData.all({this.id, this.sequenceNumber, this.chapterName, this.chapterNumber, this.updatedAt});
 
   factory ChapterData.fromJSON(Map<String, dynamic> json) {
-    return ChapterData.all(id: json["id"], sequenceNumber: json["sequenceNumber"], chapterName: json["chapterName"], chapterNumber: json["chapterNumber"], updatedAt: json["updatedAt"]!= null ? DateTime.parse(json["updatedAt"]) : null);
+    return ChapterData.all(id: json["id"], sequenceNumber: json["sequenceNumber"], chapterName: json["chapterName"], chapterNumber: json["chapterNumber"], updatedAt: json["updatedAt"] != null ? DateTime.parse(json["updatedAt"]) : null);
   }
 }
 
@@ -391,7 +400,6 @@ class CompleteManga {
 }
 
 class ChapterContent {
-
   List<String> urls;
 
   ChapterContent.all({this.urls});
@@ -402,10 +410,18 @@ class ChapterContent {
 }
 
 class CompleteChapter {
-
   String id;
   ChapterContent content;
+  ChapterData dt;
   Source source;
 
-  CompleteChapter.all(this.id, this.content, this.source);
+  CompleteChapter.all(this.id, this.content, this.dt, this.source);
+}
+
+class Chapters {
+  Map<int, ChapterData> chaps;
+  Source s;
+  int currentIndex;
+
+  Chapters.all({this.chaps, this.s, this.currentIndex});
 }

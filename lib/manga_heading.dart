@@ -1,7 +1,5 @@
 import 'package:hive/hive.dart';
 
-import 'api_objects.dart';
-
 part 'manga_heading.g.dart';
 
 @HiveType(typeId: 0)

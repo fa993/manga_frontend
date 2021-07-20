@@ -5,7 +5,6 @@ import 'package:manga_frontend/api_objects.dart';
 import 'package:transparent_image/transparent_image.dart';
 
 import 'manga_heading.dart';
-import 'dart:math';
 
 class Widgeter {
   static double imgHeight = 200;
@@ -624,9 +623,10 @@ class MangaPageChapterList extends StatelessWidget {
       child: ListView.separated(
         itemBuilder: (context, index) {
           return MangaPageChapterButton(
-            id: chaps[index].id,
+            allChaps: chaps,
             displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
             s: s,
+            index: index,
           );
         },
         scrollDirection: Axis.horizontal,
@@ -663,9 +663,10 @@ class MangaPageChapterGrid extends StatelessWidget {
         ),
         itemBuilder: (context, index) {
           return MangaPageChapterButton(
-            id: chaps[index].id,
+            allChaps: chaps,
             displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
             s: s,
+            index: index,
           );
         },
         itemCount: chaps.length,
@@ -692,11 +693,9 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
   int numOfRows;
   double leftOffsetMain;
 
-
   @override
   void initState() {
     super.initState();
-
   }
 
   @override
@@ -708,23 +707,24 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     numOfRows = (this.widget.chaps.length / numOfChapsPerRow).ceil();
   }
 
-  void figureOutWhichChapterWasClicked(BuildContext context, TapUpDetails deets){
+  void figureOutWhichChapterWasClicked(BuildContext context, TapUpDetails deets) {
     double actY = _controller.offset + deets.localPosition.dy;
     double actX = deets.localPosition.dx;
     int colNum = discountHitTest(actY, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight, 0, numOfRows);
     int rowNum = discountHitTest(actX, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth, leftOffsetMain, numOfChapsPerRow);
-    if(colNum < 0 || rowNum < 0){
+    if (colNum < 0 || rowNum < 0) {
       print("No chap clicked");
     } else {
-      print("Chap Clicked: " + ((colNum * numOfChapsPerRow) + rowNum + 1).toString());
-      MangaPageChapterButton._onChapterPress.call(context, this.widget.chaps[((colNum * numOfChapsPerRow) + rowNum)].id, this.widget.s);
+      int index = ((colNum * numOfChapsPerRow) + rowNum);
+      print("Chap Clicked: " + (index + 1).toString());
+      MangaPageChapterButton._onChapterPress.call(context, this.widget.s, this.widget.chaps, index);
     }
   }
 
-  int discountHitTest(double offsetClicked, double buttonDimension, double buttonGap, double mainOffset, int numOfGroups){
+  int discountHitTest(double offsetClicked, double buttonDimension, double buttonGap, double mainOffset, int numOfGroups) {
     double sum = buttonDimension + mainOffset;
-    for(int i = 0; i < numOfGroups; i++){
-      if(offsetClicked > sum - buttonDimension && offsetClicked < sum){
+    for (int i = 0; i < numOfGroups; i++) {
+      if (offsetClicked > sum - buttonDimension && offsetClicked < sum) {
         return i;
       }
       sum += buttonDimension + buttonGap;
@@ -792,10 +792,10 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    int rowsScrolled = (controller.offset/ (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight)).floor();
+    int rowsScrolled = (controller.offset / (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight)).floor();
     // int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
     int startIndex = numOfChapsPerRow * rowsScrolled;
-    int rowsThatCanBeDisplayed = n(viewportHeight, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil() + 1;
+    int rowsThatCanBeDisplayed = n(viewportHeight, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil() + 1 + 1;
     // double leftOffsetMain = (size.width - (numOfChapsPerRow * Widgeter.mangaPageChapterButtonWidth + (numOfChapsPerRow - 1) * Widgeter.mangaPageChapterGridSpacingWidth)) / 2;
     // int startIndex = 0;
     double offsetAtThatRow = rowsScrolled * (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight);
@@ -843,16 +843,17 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 
 class MangaPageChapterButton extends StatelessWidget {
   final String displayName;
-  final String id;
   final Source s;
+  final Map<int, ChapterData> allChaps;
+  final int index;
 
-  static Function(BuildContext, String id, Source s) _onChapterPress = (c, t, s) {};
+  static Function(BuildContext, Source s, Map<int, ChapterData> chaps, int index) _onChapterPress = (c, s, chaps, ind) {};
 
-  static void configureFunction(Function(BuildContext, String id, Source s) newFunction) {
+  static void configureFunction(Function(BuildContext, Source s, Map<int, ChapterData> chaps, int index) newFunction) {
     _onChapterPress = newFunction;
   }
 
-  const MangaPageChapterButton({Key key, this.displayName, this.id, this.s}) : super(key: key);
+  const MangaPageChapterButton({Key key, this.displayName, this.s, this.allChaps, this.index}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -866,7 +867,7 @@ class MangaPageChapterButton extends StatelessWidget {
         style: TextStyle(color: Colors.white, fontFamily: Widgeter.fontFamily),
       ),
       onPressed: () {
-        _onChapterPress.call(context, this.id, this.s);
+        _onChapterPress.call(context, this.s, this.allChaps, this.index);
       },
     );
   }
@@ -936,24 +937,23 @@ class ChapterPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
         child: CachedNetworkImage(
-      httpHeaders: headers[s.name],
-      imageUrl: url,
-      progressIndicatorBuilder: (context, s, pr) => Center(
-          child: SizedBox(
-              width: 30,
-              height: 30,
-              child: CircularProgressIndicator(
-                value: pr.progress,
-              ))),
-      errorWidget: (context, s, data) => Center(
-          child: SizedBox(
-              width: 30,
-              height: 30,
-              child: Icon(
-                Icons.error,
-                color: Colors.white,
-              ))),
-    ));
+            httpHeaders: headers[s.name],
+            imageUrl: url,
+            progressIndicatorBuilder: (context, s, pr) => Center(
+                child: SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      value: pr.progress,
+                    ))),
+            errorWidget: (context, s, data) => Center(
+                child: SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: Icon(
+                      Icons.error,
+                      color: Colors.white,
+                    )))));
   }
 }
 
@@ -977,5 +977,30 @@ class ChapterPageFromProvider extends StatelessWidget {
         );
       },
     ));
+  }
+}
+
+class ReaderAppBar extends PreferredSize {
+  @override
+  final PreferredSizeWidget child;
+  final AnimationController controller;
+  final bool visible;
+  final bool toggle;
+
+  const ReaderAppBar({Key key, @required this.child, this.controller, this.visible, this.toggle}) : super(key: key);
+
+  @override
+  Size get preferredSize => child.preferredSize;
+
+  @override
+  Widget build(BuildContext context) {
+    visible ? controller.reverse() : controller.forward();
+    return SlideTransition(
+      child: child,
+      position: Tween<Offset>(
+        begin: Offset.zero,
+        end: Offset(0, -1),
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn)),
+    );
   }
 }

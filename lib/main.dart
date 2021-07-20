@@ -6,7 +6,6 @@ import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:fullscreen/fullscreen.dart';
 
 import 'api_objects.dart';
 import 'manga_heading.dart';
@@ -15,8 +14,13 @@ import 'visual_objects.dart';
 void main() {
   HttpOverrides.global = new DevHttpsOverides();
   DBer.initializeDatabase();
-  MangaPageChapterButton.configureFunction((context, t, s) {
-    Navigator.pushNamed(context, "/read", arguments: APIer.fetchChapter(t).then((value) => CompleteChapter.all(t, value, s)));
+  MangaPageChapterButton.configureFunction((context, s, chaps, index) {
+    Navigator.pushNamed(context, "/read",
+        arguments: Chapters.all(
+          chaps: chaps,
+          s: s,
+          currentIndex: index,
+        ));
   });
   runApp(MyApp());
 }
@@ -53,7 +57,7 @@ class MyApp extends StatelessWidget {
         } else if (settings.name == '/read') {
           return MaterialPageRoute(
               builder: (context) => ReaderWidget(
-                    current: settings.arguments as Future<CompleteChapter>,
+                    current: settings.arguments as Chapters,
                   ));
         }
         return null;
@@ -222,7 +226,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           delegate: SliverChildBuilderDelegate(
             (buildContext, index) {
               if (index == _hd.length) {
-                return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
+                return CenteredFixedCircle();
               } else {
                 return Widgeter.getHomePanel(_hd.elementAt(index));
               }
@@ -464,7 +468,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                   delegate: SliverChildBuilderDelegate(
                     (buildContext, index) {
                       if (index == _hd.length) {
-                        return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
+                        return CenteredFixedCircle();
                       } else {
                         return InkWell(
                           child: MangaThumbnail(
@@ -544,11 +548,7 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
             ],
           ));
     } else if (_mn == null) {
-      return SizedBox(
-        width: 30,
-        height: 30,
-        child: Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator())),
-      );
+      return SizedBox(width: 30, height: 30, child: CenteredFixedCircle());
     } else {
       return Scaffold(
           backgroundColor: Colors.black,
@@ -601,7 +601,8 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
 }
 
 class ReaderWidget extends StatefulWidget {
-  final Future<CompleteChapter> current;
+  final Chapters current;
+  final int maxCacheCount = 1;
 
   const ReaderWidget({Key key, this.current}) : super(key: key);
 
@@ -609,106 +610,290 @@ class ReaderWidget extends StatefulWidget {
   _ReaderWidgetState createState() => _ReaderWidgetState();
 }
 
-class _ReaderWidgetState extends State<ReaderWidget> {
-
-  CompleteChapter _chap;
-  Map<int, CachedNetworkImageProvider> _imgs = {};
-  int _pageNumber = 0;
-  TransformationController _controller = TransformationController();
+class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderStateMixin {
+  TransformationController _transformationController = TransformationController();
+  bool _visible = false;
+  RestartableTimer _timer;
+  AnimationController _animationController;
+  PageController _pageController;
+  int _formalIndexAtStartOfCurrentChapter = 0;
+  int _requestedNextChapterLoadIndex = -1;
+  int _requestedPreviousChapterLoadIndex = -1;
+  Map<int, CompleteChapter> _chapIndexToChapter = {};
+  Map<int, int> _chapStartsToChapIndex = {};
+  List<int> _chapStarts = [];
 
   @override
   void initState() {
     super.initState();
-    this.widget.current.then((value) {
-      setState(() {
-        _chap = value;
-        // _chap.content.urls.asMap().forEach((index, element) {
-        //   Future.delayed(Duration(milliseconds: index * 500), () {
-        //     _imgs.putIfAbsent(index, () => CachedNetworkImageProvider(element, scale: 1, headers: headers[_chap.source.name]));
-        //   });
-        // });
-      });
-      // _imgs = _chap.content.urls.map((e) => CachedNetworkImageProvider(e, headers: headers[_chap.source.name])).toList();
+    _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 200),
+    );
+    _formalIndexAtStartOfCurrentChapter = (100000);
+    _pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
+    _pageController.addListener(() {
+      int index = _pageController.page.toInt();
+      int chapIndex = findChapIndex(index);
+      if(chapIndex < 0){
+        return;
+      }
+      int plusOne = chapIndex + 1;
+      int minusOne = chapIndex - 1;
+      if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
+        _requestedNextChapterLoadIndex = plusOne;
+        populateChapter(plusOne).then((value) {
+          int fps = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
+          setState(() {
+            addProper(_chapStarts, fps);
+            _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
+          });
+        });
+      }
+      if (minusOne > -1 && !_chapIndexToChapter.containsKey(minusOne) && _requestedPreviousChapterLoadIndex != minusOne) {
+        _requestedPreviousChapterLoadIndex = minusOne;
+        populateChapter(minusOne).then((value) {
+          int fps = findChapStart(index) - value.content.urls.length;
+          setState(() {
+            addProper(_chapStarts, fps);
+            _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
+          });
+        });
+      }
     });
+    assembleProper(_formalIndexAtStartOfCurrentChapter);
+  }
+
+  Future<CompleteChapter> getChapter(int index) {
+    if (index >= this.widget.current.chaps.length) {
+      throw new Exception("index out of bounds");
+    } else if (index < 0) {
+      throw new Exception("index out of bounds");
+    }
+    ChapterData dt = this.widget.current.chaps[index];
+    return APIer.fetchChapter(dt.id).then((value) => CompleteChapter.all(dt.id, value, dt, this.widget.current.s));
+  }
+
+  // void assemble() {
+  //   getChapter(this._currentChapterInList).then((value) {
+  //     setState(() {
+  //       _recentChaps.add(value);
+  //       _currentChapterIndex = 0;
+  //     });
+  //   }).whenComplete(() {
+  //     _requestedNextChapterLoadIndex = _currentChapterInList + 1;
+  //     _requestedPreviousChapterLoadIndex = _currentChapterInList - 1;
+  //     getNextChapter();
+  //     getPreviousChapter();
+  //   });
+  // }
+
+  void assembleProper(int formalPageStart) {
+    int x = this.widget.current.currentIndex;
+    populateChapter(x).then((value) {
+      setState(() {
+        addProper(_chapStarts, formalPageStart);
+        _chapStartsToChapIndex.putIfAbsent(formalPageStart, () => x);
+      });
+      return value;
+    }).then((value) {
+      int plusOne = this.widget.current.currentIndex + 1;
+      if (plusOne < this.widget.current.chaps.length) {
+        _requestedNextChapterLoadIndex = plusOne;
+        populateChapter(plusOne).then((v1) {
+          int fps = formalPageStart + value.content.urls.length;
+          setState(() {
+            addProper(_chapStarts, fps);
+            _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
+          });
+        });
+      }
+    });
+    int minusOne = this.widget.current.currentIndex - 1;
+    if (minusOne > -1) {
+      _requestedPreviousChapterLoadIndex = minusOne;
+      populateChapter(minusOne).then((value) {
+        int fps = formalPageStart - value.content.urls.length;
+        setState(() {
+          addProper(_chapStarts, fps);
+          _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
+        });
+      });
+    }
+  }
+
+  Future<CompleteChapter> populateChapter(int index) {
+    return getChapter(index).then((value) {
+      _chapIndexToChapter.update(index, (v) => value, ifAbsent: () => value);
+      return value;
+    });
+  }
+
+  int findChapIndex(int formalPageNumber) {
+    int x = findChapStart(formalPageNumber);
+    return x < 0 ? -1 : _chapStartsToChapIndex[x];
+  }
+
+  int findChapStart(int formalPageNumber) {
+    int x = _chapStarts.lastIndexWhere((element) => formalPageNumber >= element);
+    return x < 0 ? -1 : _chapStarts[x];
+  }
+
+  void addProper(List<int> sortedList, int add) {
+    int min = 0;
+    int max = sortedList.length;
+    while (min < max) {
+      final int mid = min + ((max - min) >> 1);
+      final int element = sortedList[mid];
+      final int comp = element.compareTo(add);
+      if (comp == 0) {
+        return;
+      }
+      if (comp < 0) {
+        min = mid + 1;
+      } else {
+        max = mid;
+      }
+    }
+    sortedList.insert(min, add);
+  }
+
+  void collapseTopBar() {
+    setState(() {
+      _visible = false;
+    });
+  }
+
+  void toggleTopBar() {
+    _timer.cancel();
+    if (!_visible) {
+      setState(() {
+        _visible = true;
+      });
+      _timer.reset();
+    } else {
+      setState(() {
+        _visible = false;
+      });
+    }
+  }
+
+  void expandTopBar() {
+    if (!_visible) {
+      setState(() {
+        _visible = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    if (_visible) {
+      _timer.cancel();
+    }
+    _transformationController.dispose();
+    _animationController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_chap != null) {
-      // for(int i = 0; i < _chap.urls.length; i++){
-      //   _screen.add(SizedBox());
-      // }
-      // _screen[0] = Widgeter.chapterImage(_chap.urls[0]);
-      // for (int i = 0; i < _chap.urls.length; i++) {
-      //   _screen.add(ChapterPage(url: _chap.urls[i]));
-      // }
-      // return Scaffold(
-      //     backgroundColor: Colors.black,
-      //     body: GestureDetector(
-      //         onTap: () {
-      //           // loadAndReplace(_pageNumber + 1);
-      //           increment(1);
-      //         },
-      //         onHorizontalDragEnd: (t) {
-      //           if (t.velocity.pixelsPerSecond.dx > 0) {
-      //             increment(-1);
-      //           } else {
-      //             increment(1);
-      //           }
-      //         },
-      //         child: InteractiveViewer(
-      //           transformationController: _controller,
-      //             child: ChapterPage(
-      //           url: _chap.content.urls[_pageNumber],
-      //           s: _chap.source,
-      //         ))));
-      return Scaffold(
+    String displayName = "";
+    if (_pageController.hasClients) {
+      int indexP = _pageController.page.toInt();
+      int chapIndex = findChapIndex(indexP);
+      if (chapIndex > -1) {
+        CompleteChapter chp1 = _chapIndexToChapter[chapIndex];
+        displayName = chp1.dt.chapterNumber;
+      }
+    }
+    return Scaffold(
         backgroundColor: Colors.black,
-        // body: PageView.builder(
-        //   allowImplicitScrolling: true,
-        //   itemBuilder: (context, index) {
-        //     return ChapterPage(url: _chap.content.urls[index], s: _chap.source);
-        //   },
-        //   itemCount: _chap.content.urls.length,
-        // ),
-        body: PageView(
-          allowImplicitScrolling: true,
-          children: _chap.content.urls.map((value) => ChapterPage(url: value, s: _chap.source)).toList(),
+        extendBodyBehindAppBar: true,
+        appBar: ReaderAppBar(
+          child: AppBar(
+            title: Text(displayName),
+            centerTitle: true,
+            actions: [IconButton(icon: Icon(Icons.settings), onPressed: () => print('123'))],
+          ),
+          controller: _animationController,
+          visible: _visible,
         ),
-      );
-    } else {
-      return Center(
-          child: SizedBox(
-        width: 30,
-        height: 30,
-        child: CircularProgressIndicator(),
-      ));
-    }
+        body: GestureDetector(
+          onTap: toggleTopBar,
+          child: PageView.custom(
+              allowImplicitScrolling: true,
+              controller: _pageController,
+              childrenDelegate: SliverChildBuilderDelegate((context, index) {
+                int x1 = findChapStart(index);
+                if (x1 < 0) {
+                  return CenteredFixedCircle();
+                } else {
+                  int pgNum = index - x1;
+                  int chapNum = _chapStartsToChapIndex[x1];
+                  CompleteChapter chp = _chapIndexToChapter[chapNum];
+                  if (pgNum >= chp.content.urls.length) {
+                    return CenteredFixedCircle();
+                  } else {
+                    return ChapterPage(url: chp.content.urls[pgNum], s: chp.source);
+                  }
+                }
+              })),
+        ));
   }
 
-  // void loadAndReplace(int nextIndex) {
-  //   if (nextIndex >= _screen.length) {
-  //     return;
-  //   }
-  //   if (_screen[nextIndex] is SizedBox) {
-  //     _screen[nextIndex] = ChapterPage(url: _chap.urls[nextIndex]);
-  //   }
-  //   setState(() {
-  //     _pageNumber = nextIndex;
-  //   });
-  // }
+// void loadAndReplace(int nextIndex) {
+//   if (nextIndex >= _screen.length) {
+//     return;
+//   }
+//   if (_screen[nextIndex] is SizedBox) {
+//     _screen[nextIndex] = ChapterPage(url: _chap.urls[nextIndex]);
+//   }
+//   setState(() {
+//     _pageNumber = nextIndex;
+//   });
+// }
 
-  void nextPage(int nextIndex) {
-    if (nextIndex > -1 && nextIndex < _chap.content.urls.length && nextIndex != _pageNumber) {
-      setState(() {
-        _pageNumber = nextIndex;
-      });
-      _controller.value = Matrix4.identity();
-    }
+// void nextPage(int nextIndex) {
+//   if (_currentChapterIndex > -1 && nextIndex > -1 && nextIndex < _recentChaps.elementAt(_currentChapterIndex).content.urls.length && nextIndex != _pageNumber) {
+//     setState(() {
+//       _pageNumber = nextIndex;
+//     });
+//     _controller.value = Matrix4.identity();
+//   }
+// }
+//
+// void increment(int inc) {
+//   nextPage(_pageNumber + inc);
+// }
+}
+
+class RestartableTimer {
+  Timer _timer;
+
+  final Duration _duration;
+
+  final ZoneCallback _callback;
+
+  RestartableTimer(this._duration, this._callback) : _timer = Timer(_duration, _callback);
+
+  void reset() {
+    _timer.cancel();
+    _timer = Timer(_duration, _callback);
   }
 
-  void increment(int inc) {
-    nextPage(_pageNumber + inc);
+  void cancel() {
+    _timer.cancel();
+  }
+}
+
+class CenteredFixedCircle extends StatelessWidget {
+  const CenteredFixedCircle({Key key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
   }
 }
 
