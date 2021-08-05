@@ -503,11 +503,14 @@ class MangaPageButtonPanel extends StatelessWidget {
 }
 
 class MangaPageChapterPanel extends StatefulWidget {
+  final String mangaId;
   final Map<int, ChapterData> chaps;
   final Source s;
   final int expandedIndex;
 
-  const MangaPageChapterPanel({Key key, this.chaps, this.s, this.expandedIndex}) : super(key: key);
+  static Function(BuildContext, Chapters) onClick = (c, t) => {};
+
+  const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex}) : super(key: key);
 
   @override
   _MangaPageChapterPanelState createState() => _MangaPageChapterPanelState();
@@ -540,14 +543,10 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
     // );
   }
 
-  double n(double dimension, double buttonDimension, double buttonSpacing) {
-    double sum = buttonDimension;
-    int i = 1;
-    while (sum < dimension) {
-      sum += buttonDimension + buttonSpacing;
-      i++;
-    }
-    return (i - 1).roundToDouble();
+  Function onClick(int index) {
+    return (context) {
+      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s));
+    };
   }
 
   @override
@@ -568,7 +567,15 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
             },
           ),
         ),
-        this.widget.expandedIndex == _expandedIndex ? MangaPageCustomChapterGrid(chaps: this.widget.chaps, s: this.widget.s) : MangaPageChapterList(chaps: this.widget.chaps, s: this.widget.s),
+        this.widget.expandedIndex == _expandedIndex
+            ? MangaPageCustomChapterGrid(
+                chaps: this.widget.chaps,
+                onClick: onClick,
+              )
+            : MangaPageChapterList(
+                chaps: this.widget.chaps,
+                onClick: onClick,
+              ),
       ],
     );
   }
@@ -611,10 +618,10 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 // }
 
 class MangaPageChapterList extends StatelessWidget {
+  final Function onClick;
   final Map<int, ChapterData> chaps;
-  final Source s;
 
-  const MangaPageChapterList({Key key, this.chaps, this.s}) : super(key: key);
+  const MangaPageChapterList({Key key, this.onClick, this.chaps}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -623,10 +630,8 @@ class MangaPageChapterList extends StatelessWidget {
       child: ListView.separated(
         itemBuilder: (context, index) {
           return MangaPageChapterButton(
-            allChaps: chaps,
             displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
-            s: s,
-            index: index,
+            onClick: onClick.call(index),
           );
         },
         scrollDirection: Axis.horizontal,
@@ -641,47 +646,47 @@ class MangaPageChapterList extends StatelessWidget {
   }
 }
 
-class MangaPageChapterGrid extends StatelessWidget {
-  final Map<int, ChapterData> chaps;
-  final Source s;
-
-  const MangaPageChapterGrid({Key key, this.chaps, this.s}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height / 2,
-      ),
-      // height: this.height,
-      child: GridView.builder(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: Widgeter.mangaPageChapterButtonWidth,
-          mainAxisExtent: Widgeter.mangaPageChapterButtonHeight,
-          mainAxisSpacing: Widgeter.mangaPageChapterGridSpacingHeight,
-          crossAxisSpacing: Widgeter.mangaPageChapterGridSpacingWidth,
-        ),
-        itemBuilder: (context, index) {
-          return MangaPageChapterButton(
-            allChaps: chaps,
-            displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
-            s: s,
-            index: index,
-          );
-        },
-        itemCount: chaps.length,
-        padding: EdgeInsets.all(0.0),
-        shrinkWrap: true,
-      ),
-    );
-  }
-}
+// class MangaPageChapterGrid extends StatelessWidget {
+//   final Map<int, ChapterData> chaps;
+//   final Source s;
+//
+//   const MangaPageChapterGrid({Key key, this.chaps, this.s}) : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return ConstrainedBox(
+//       constraints: BoxConstraints(
+//         maxHeight: MediaQuery.of(context).size.height / 2,
+//       ),
+//       // height: this.height,
+//       child: GridView.builder(
+//         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+//           maxCrossAxisExtent: Widgeter.mangaPageChapterButtonWidth,
+//           mainAxisExtent: Widgeter.mangaPageChapterButtonHeight,
+//           mainAxisSpacing: Widgeter.mangaPageChapterGridSpacingHeight,
+//           crossAxisSpacing: Widgeter.mangaPageChapterGridSpacingWidth,
+//         ),
+//         itemBuilder: (context, index) {
+//           return MangaPageChapterButton(
+//             allChaps: chaps,
+//             displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
+//             s: s,
+//             index: index,
+//           );
+//         },
+//         itemCount: chaps.length,
+//         padding: EdgeInsets.all(0.0),
+//         shrinkWrap: true,
+//       ),
+//     );
+//   }
+// }
 
 class MangaPageCustomChapterGrid extends StatefulWidget {
+  final Function onClick;
   final Map<int, ChapterData> chaps;
-  final Source s;
 
-  const MangaPageCustomChapterGrid({Key key, this.chaps, this.s}) : super(key: key);
+  const MangaPageCustomChapterGrid({Key key, this.chaps, this.onClick}) : super(key: key);
 
   @override
   _MangaPageCustomChapterGridState createState() => _MangaPageCustomChapterGridState();
@@ -717,7 +722,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     } else {
       int index = ((colNum * numOfChapsPerRow) + rowNum);
       print("Chap Clicked: " + (index + 1).toString());
-      MangaPageChapterButton._onChapterPress.call(context, this.widget.s, this.widget.chaps, index);
+      this.widget.onClick.call(index).call(context);
     }
   }
 
@@ -744,7 +749,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
         child: SingleChildScrollView(
           controller: _controller,
           child: CustomPaint(
-            painter: MangaPageCustomChapterGridPainter(chaps: this.widget.chaps, s: this.widget.s, controller: _controller, numOfChapsPerRow: this.numOfChapsPerRow, numOfRows: numOfRows, leftOffsetMain: this.leftOffsetMain, viewportHeight: h),
+            painter: MangaPageCustomChapterGridPainter(chaps: this.widget.chaps, controller: _controller, numOfChapsPerRow: this.numOfChapsPerRow, numOfRows: numOfRows, leftOffsetMain: this.leftOffsetMain, viewportHeight: h),
             size: Size(MediaQuery.of(context).size.width, numOfRows * (Widgeter.mangaPageChapterButtonHeight + Widgeter.mangaPageChapterGridSpacingHeight)),
           ),
         ),
@@ -776,7 +781,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
   final double viewportHeight;
 
   final Map<int, ChapterData> chaps;
-  final Source s;
+
   final ScrollController controller;
 
   final double radius = 2.0;
@@ -788,7 +793,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
   final double chapterButtonPaddingX = 5.0;
   final double chapterButtonPaddingY = 5.0;
 
-  MangaPageCustomChapterGridPainter({this.chaps, this.s, this.controller, this.numOfChapsPerRow, this.numOfRows, this.leftOffsetMain, this.viewportHeight});
+  MangaPageCustomChapterGridPainter({this.chaps, this.controller, this.numOfChapsPerRow, this.numOfRows, this.leftOffsetMain, this.viewportHeight});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -842,18 +847,10 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 }
 
 class MangaPageChapterButton extends StatelessWidget {
+  final Function onClick;
   final String displayName;
-  final Source s;
-  final Map<int, ChapterData> allChaps;
-  final int index;
 
-  static Function(BuildContext, Source s, Map<int, ChapterData> chaps, int index) _onChapterPress = (c, s, chaps, ind) {};
-
-  static void configureFunction(Function(BuildContext, Source s, Map<int, ChapterData> chaps, int index) newFunction) {
-    _onChapterPress = newFunction;
-  }
-
-  const MangaPageChapterButton({Key key, this.displayName, this.s, this.allChaps, this.index}) : super(key: key);
+  const MangaPageChapterButton({Key key, this.onClick, this.displayName}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -867,7 +864,7 @@ class MangaPageChapterButton extends StatelessWidget {
         style: TextStyle(color: Colors.white, fontFamily: Widgeter.fontFamily),
       ),
       onPressed: () {
-        _onChapterPress.call(context, this.s, this.allChaps, this.index);
+        this.onClick.call(context);
       },
     );
   }
@@ -894,6 +891,7 @@ class _MangaPageState extends State<MangaPage> {
         itemBuilder: (context, index) {
           if (index > 3) {
             return MangaPageChapterPanel(
+              mangaId: widget.manga.id,
               s: widget.manga.linkedMangas[index - 3 - 1].source,
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
               expandedIndex: index,
@@ -908,6 +906,7 @@ class _MangaPageState extends State<MangaPage> {
               return MangaPageButtonPanel();
             case 3:
               return MangaPageChapterPanel(
+                mangaId: widget.manga.id,
                 s: widget.manga.source,
                 chaps: widget.manga.chapters,
                 expandedIndex: 0,
@@ -930,30 +929,37 @@ class ChapterPage extends StatelessWidget {
 
   final String url;
   final Source s;
+  final double width;
 
-  const ChapterPage({Key key, this.url, this.s}) : super(key: key);
+  const ChapterPage({Key key, this.url, this.s, this.width}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-        child: CachedNetworkImage(
-            httpHeaders: headers[s.name],
-            imageUrl: url,
-            progressIndicatorBuilder: (context, s, pr) => Center(
-                child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: CircularProgressIndicator(
-                      value: pr.progress,
-                    ))),
-            errorWidget: (context, s, data) => Center(
-                child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: Icon(
-                      Icons.error,
-                      color: Colors.white,
-                    )))));
+    return CachedNetworkImage(
+      httpHeaders: headers[s.name],
+      imageUrl: url,
+      width: width,
+      fadeInDuration: Duration.zero,
+      progressIndicatorBuilder: (context, s, pr) => Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: CircularProgressIndicator(
+            value: pr.progress,
+          ),
+        ),
+      ),
+      errorWidget: (context, s, data) => Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Icon(
+            Icons.error,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -987,7 +993,7 @@ class ReaderAppBar extends PreferredSize {
   final bool visible;
   final bool toggle;
 
-  const ReaderAppBar({Key key, @required this.child, this.controller, this.visible, this.toggle}) : super(key: key);
+  const ReaderAppBar({Key key, this.child, this.controller, this.visible, this.toggle}) : super(key: key);
 
   @override
   Size get preferredSize => child.preferredSize;
@@ -1001,6 +1007,34 @@ class ReaderAppBar extends PreferredSize {
         begin: Offset.zero,
         end: Offset(0, -1),
       ).animate(CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn)),
+    );
+  }
+}
+
+class ReaderPageSettingsPanel extends StatefulWidget {
+  final Function onLeftToRight;
+  final Function onRightToLeft;
+  final Function onUpToDown;
+
+  const ReaderPageSettingsPanel({Key key, this.onLeftToRight, this.onRightToLeft, this.onUpToDown}) : super(key: key);
+
+  @override
+  _ReaderPageSettingsPanelState createState() => _ReaderPageSettingsPanelState();
+}
+
+class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.yellow,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(icon: Icon(Icons.arrow_forward), onPressed: () => this.widget.onLeftToRight.call()),
+          IconButton(icon: Icon(Icons.arrow_back), onPressed: () => this.widget.onRightToLeft.call()),
+          IconButton(icon: Icon(Icons.arrow_downward), onPressed: () => this.widget.onUpToDown.call()),
+        ],
+      ),
     );
   }
 }

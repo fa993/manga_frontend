@@ -11,13 +11,13 @@ import 'package:uuid/uuid.dart' as uuid;
 import 'manga_heading.dart';
 
 class APIer {
-  static String _serverURl = "https://192.168.29.227:8080";
+  static String _serverURL = "https://192.168.29.227:8080";
   static String _serverMapping = "/public/manga";
 
   static http.Client _cli = new http.Client();
 
   static Future<List<IndexedMangaHeading>> fetchFavourites() async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/favourites"));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/favourites"));
     if (response.statusCode == HttpStatus.ok) {
       return await compute(doParseFavourites, response.body);
     } else {
@@ -30,7 +30,7 @@ class APIer {
   }
 
   static Future<List<MangaHeading>> fetchHome(int offset, [int limit = 10]) async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/home?limit=" + limit.toString() + "&offset=" + offset.toString()));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/home?limit=" + limit.toString() + "&offset=" + offset.toString()));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status Code: " + response.statusCode.toString());
     }
@@ -38,7 +38,7 @@ class APIer {
   }
 
   static Future<MangaHeading> fetchTest() async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/thumbnail"));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/thumbnail"));
     if (response.statusCode == HttpStatus.ok) {
       return MangaHeading.fromJSON(jsonDecode(response.body));
     } else {
@@ -47,7 +47,7 @@ class APIer {
   }
 
   static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async {
-    final response = await _cli.post(Uri.parse(_serverURl + _serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
+    final response = await _cli.post(Uri.parse(_serverURL + _serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -61,7 +61,7 @@ class APIer {
   }
 
   static Future<CompleteManga> fetchManga(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/" + id));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/" + id));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -75,7 +75,7 @@ class APIer {
   }
 
   static Future<ChapterContent> fetchChapter(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/chapter/" + id));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -85,7 +85,7 @@ class APIer {
   }
 
   static Future<ChapterContent> fetchChapterOpt(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURl + _serverMapping + "/chapter/" + id));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
@@ -97,6 +97,15 @@ class APIer {
 
   static ChapterContent doParseChapter(String response) {
     return ChapterContent.fromJSON(jsonDecode(response));
+  }
+  
+  static Future<int> fetchChapterPageNumber(String mangaId, int sequenceNumber) async {
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/findIndex/" + mangaId + "/" + sequenceNumber.toString()));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception("Failed Status code: " + response.statusCode.toString());
+    } else {
+      return jsonDecode(response.body);
+    }
   }
 }
 
@@ -419,9 +428,11 @@ class CompleteChapter {
 }
 
 class Chapters {
+
+  String mangaId;
   Map<int, ChapterData> chaps;
   Source s;
   int currentIndex;
 
-  Chapters.all({this.chaps, this.s, this.currentIndex});
+  Chapters.all({this.mangaId, this.chaps, this.s, this.currentIndex});
 }

@@ -5,7 +5,10 @@ import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'api_objects.dart';
 import 'manga_heading.dart';
@@ -14,14 +17,15 @@ import 'visual_objects.dart';
 void main() {
   HttpOverrides.global = new DevHttpsOverides();
   DBer.initializeDatabase();
-  MangaPageChapterButton.configureFunction((context, s, chaps, index) {
-    Navigator.pushNamed(context, "/read",
-        arguments: Chapters.all(
-          chaps: chaps,
-          s: s,
-          currentIndex: index,
-        ));
-  });
+  // MangaPageChapterButton.configureFunction((context, s, chaps, index) {
+  //   Navigator.pushNamed(context, "/read",
+  //       arguments: Chapters.all(
+  //         chaps: chaps,
+  //         s: s,
+  //         currentIndex: index,
+  //       ));
+  // });
+  MangaPageChapterPanel.onClick = (c, t) => Navigator.pushNamed(c, "/read", arguments: t);
   runApp(MyApp());
 }
 
@@ -561,11 +565,16 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
                   expandedHeight: MediaQuery.of(context).size.height,
                   pinned: true,
                   flexibleSpace: FlexibleSpaceBar(
-                      titlePadding: EdgeInsets.all(16.0),
-                      background: CachedNetworkImage(
+                    titlePadding: EdgeInsets.all(16.0),
+                    //TODO think about this because title text also becomes invisible
+                    background: Container(
+                      color: Colors.black,
+                      child: CachedNetworkImage(
                         imageUrl: _mn.coverURL,
-                        fit: BoxFit.cover,
-                      )),
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                  ),
                 ),
               ];
             },
@@ -601,6 +610,9 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
 }
 
 class ReaderWidget extends StatefulWidget {
+  // final double settingsWidth = 100;
+  final double settingsHeight = 100;
+
   final Chapters current;
   final int maxCacheCount = 1;
 
@@ -611,58 +623,90 @@ class ReaderWidget extends StatefulWidget {
 }
 
 class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderStateMixin {
+  static const int LEFT_TO_RIGHT = 0;
+  static const int RIGHT_TO_LEFT = 1;
+  static const int UP_TO_DOWN = 2;
+
   TransformationController _transformationController = TransformationController();
   bool _visible = false;
   RestartableTimer _timer;
   AnimationController _animationController;
   PageController _pageController;
+  ItemScrollController _scrollController;
+  ItemPositionsListener _scrollListener;
   int _formalIndexAtStartOfCurrentChapter = 0;
+  int _formalIndexForList = 0;
   int _requestedNextChapterLoadIndex = -1;
   int _requestedPreviousChapterLoadIndex = -1;
   Map<int, CompleteChapter> _chapIndexToChapter = {};
   Map<int, int> _chapStartsToChapIndex = {};
   List<int> _chapStarts = [];
+  OverlayEntry _settings;
+  LayerLink _link;
+
+  // bool _reverse = false;
+  // bool _scrollDirectionHorizontal = true;
+  // bool _continuousScroll = false;
+  int _displayMode = RIGHT_TO_LEFT;
+  int _upperBoundIndex = -1;
 
   @override
   void initState() {
     super.initState();
+    _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 200),
     );
-    _formalIndexAtStartOfCurrentChapter = (100000);
-    _pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
-    _pageController.addListener(() {
-      int index = _pageController.page.toInt();
-      int chapIndex = findChapIndex(index);
-      if(chapIndex < 0){
-        return;
-      }
-      int plusOne = chapIndex + 1;
-      int minusOne = chapIndex - 1;
-      if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
-        _requestedNextChapterLoadIndex = plusOne;
-        populateChapter(plusOne).then((value) {
-          int fps = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
-          setState(() {
-            addProper(_chapStarts, fps);
-            _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
-          });
-        });
-      }
-      if (minusOne > -1 && !_chapIndexToChapter.containsKey(minusOne) && _requestedPreviousChapterLoadIndex != minusOne) {
-        _requestedPreviousChapterLoadIndex = minusOne;
-        populateChapter(minusOne).then((value) {
-          int fps = findChapStart(index) - value.content.urls.length;
-          setState(() {
-            addProper(_chapStarts, fps);
-            _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
-          });
-        });
-      }
+    APIer.fetchChapterPageNumber(this.widget.current.mangaId, this.widget.current.chaps[this.widget.current.currentIndex].sequenceNumber).then((value) {
+      _formalIndexAtStartOfCurrentChapter = (value);
+      _formalIndexForList = _formalIndexAtStartOfCurrentChapter;
+      _pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
+      _pageController.addListener(() {
+        int index = _pageController.page.toInt();
+        _listen(index);
+      });
+      _scrollController = ItemScrollController();
+      _scrollListener = ItemPositionsListener.create();
+      _scrollListener.itemPositions.addListener(() {
+        int index = _scrollListener.itemPositions.value.first.index;
+        _listen(index);
+      });
+      assembleProper(_formalIndexAtStartOfCurrentChapter);
     });
-    assembleProper(_formalIndexAtStartOfCurrentChapter);
+  }
+
+  void _listen(int index) {
+    int chapIndex = findChapIndex(index);
+    if (chapIndex < 0) {
+      return;
+    }
+    int plusOne = chapIndex + 1;
+    int minusOne = chapIndex - 1;
+    if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
+      _requestedNextChapterLoadIndex = plusOne;
+      populateChapter(plusOne).then((value) {
+        int fps = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
+        setState(() {
+          addProper(_chapStarts, fps);
+          _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
+        });
+      });
+    }
+    if (minusOne > -1 && !_chapIndexToChapter.containsKey(minusOne) && _requestedPreviousChapterLoadIndex != minusOne) {
+      _requestedPreviousChapterLoadIndex = minusOne;
+      populateChapter(minusOne).then((value) {
+        int fps = findChapStart(index) - value.content.urls.length;
+        setState(() {
+          addProper(_chapStarts, fps);
+          _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
+        });
+      });
+    }
+    if (plusOne == this.widget.current.chaps.length) {
+      _upperBoundIndex = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
+    }
   }
 
   Future<CompleteChapter> getChapter(int index) {
@@ -759,39 +803,91 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     sortedList.insert(min, add);
   }
 
+  void toggleTopBar() {
+    _timer.cancel();
+    if (!_visible) {
+      expandTopBar();
+      _timer.reset();
+    } else {
+      if (_settings != null) {
+        _settings.remove();
+        _settings = null;
+      }
+      collapseTopBar();
+    }
+  }
+
+  void expandTopBar() {
+    setState(() {
+      _visible = true;
+    });
+  }
+
   void collapseTopBar() {
     setState(() {
       _visible = false;
     });
   }
 
-  void toggleTopBar() {
+  void onPressSettings(BuildContext context) {
     _timer.cancel();
-    if (!_visible) {
-      setState(() {
-        _visible = true;
-      });
-      _timer.reset();
+    if (_settings == null) {
+      initSettings(_settings);
+      Overlay.of(context).insert(_settings);
     } else {
-      setState(() {
-        _visible = false;
-      });
+      _settings.remove();
+      _settings = null;
+      _timer.reset();
     }
   }
 
-  void expandTopBar() {
-    if (!_visible) {
-      setState(() {
-        _visible = true;
-      });
-    }
+  void initSettings(OverlayEntry settings) {
+    _settings = OverlayEntry(builder: (context) {
+      return Positioned(
+        height: this.widget.settingsHeight,
+        child: CompositedTransformFollower(
+          link: _link,
+          followerAnchor: Alignment.topRight,
+          targetAnchor: Alignment.bottomRight,
+          offset: Offset(0, 20),
+          child: ReaderPageSettingsPanel(
+            onLeftToRight: () {
+              if (_displayMode == UP_TO_DOWN) {
+                _pageController = PageController(initialPage: _scrollListener.itemPositions.value.first.index, keepPage: false);
+                _pageController.addListener(() {
+                  int index = _pageController.page.toInt();
+                  _listen(index);
+                });
+              }
+              setState(() => _displayMode = LEFT_TO_RIGHT);
+            },
+            onRightToLeft: () {
+              if (_displayMode == UP_TO_DOWN) {
+                _pageController = PageController(initialPage: _scrollListener.itemPositions.value.first.index, keepPage: false);
+                _pageController.addListener(() {
+                  int index = _pageController.page.toInt();
+                  _listen(index);
+                });
+              }
+              setState(() => _displayMode = RIGHT_TO_LEFT);
+            },
+            onUpToDown: () {
+              _formalIndexForList = _pageController.page.toInt();
+              setState(() => _displayMode = UP_TO_DOWN);
+            },
+          ),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
     super.dispose();
-    if (_visible) {
-      _timer.cancel();
+    _timer.cancel();
+    if (_settings != null) {
+      _settings.remove();
+      Future.delayed(Duration(milliseconds: 100), () => _settings.dispose());
     }
     _transformationController.dispose();
     _animationController.dispose();
@@ -800,6 +896,9 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     String displayName = "";
+    if (_pageController == null) {
+      return CenteredFixedCircle();
+    }
     if (_pageController.hasClients) {
       int indexP = _pageController.page.toInt();
       int chapIndex = findChapIndex(indexP);
@@ -815,31 +914,81 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
           child: AppBar(
             title: Text(displayName),
             centerTitle: true,
-            actions: [IconButton(icon: Icon(Icons.settings), onPressed: () => print('123'))],
+            actions: [
+              CompositedTransformTarget(
+                link: _link,
+                child: IconButton(icon: Icon(Icons.settings), onPressed: () => onPressSettings(context)),
+              )
+            ],
           ),
           controller: _animationController,
           visible: _visible,
         ),
         body: GestureDetector(
-          onTap: toggleTopBar,
-          child: PageView.custom(
-              allowImplicitScrolling: true,
-              controller: _pageController,
-              childrenDelegate: SliverChildBuilderDelegate((context, index) {
-                int x1 = findChapStart(index);
-                if (x1 < 0) {
-                  return CenteredFixedCircle();
-                } else {
-                  int pgNum = index - x1;
-                  int chapNum = _chapStartsToChapIndex[x1];
-                  CompleteChapter chp = _chapIndexToChapter[chapNum];
-                  if (pgNum >= chp.content.urls.length) {
-                    return CenteredFixedCircle();
-                  } else {
-                    return ChapterPage(url: chp.content.urls[pgNum], s: chp.source);
-                  }
-                }
-              })),
+          onTapDown: (t) => toggleTopBar(),
+          child: _displayMode == UP_TO_DOWN
+              ? ScrollablePositionedList.builder(
+                  initialScrollIndex: _formalIndexForList,
+                  itemPositionsListener: _scrollListener,
+                  itemScrollController: _scrollController,
+                  initialAlignment: 0,
+                  //TODO point of failure
+                  itemCount: _upperBoundIndex == -1 ? 100000 : _upperBoundIndex,
+
+                  itemBuilder: (context, index) {
+                    int x1 = findChapStart(index);
+                    if (x1 < 0) {
+                      return CenteredFixedCircle();
+                    } else {
+                      int pgNum = index - x1;
+                      int chapNum = _chapStartsToChapIndex[x1];
+                      CompleteChapter chp = _chapIndexToChapter[chapNum];
+                      if (pgNum >= chp.content.urls.length) {
+                        return CenteredFixedCircle();
+                      } else {
+                        return InteractiveViewer(
+                          child: ChapterPage(
+                            url: chp.content.urls[pgNum],
+                            s: chp.source,
+                            width: MediaQuery.of(context).size.width,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                )
+              : PageView.custom(
+                  allowImplicitScrolling: true,
+                  controller: _pageController,
+                  reverse: _displayMode == RIGHT_TO_LEFT,
+                  childrenDelegate: SliverChildBuilderDelegate((context, index) {
+                    if (index == _upperBoundIndex) {
+                      return null;
+                    }
+                    int x1 = findChapStart(index);
+                    if (x1 < 0) {
+                      return CenteredFixedCircle();
+                    } else {
+                      int pgNum = index - x1;
+                      int chapNum = _chapStartsToChapIndex[x1];
+                      CompleteChapter chp = _chapIndexToChapter[chapNum];
+                      if (pgNum >= chp.content.urls.length) {
+                        return CenteredFixedCircle();
+                      } else {
+                        return Center(
+                          child: InteractiveViewer(
+                            child: SingleChildScrollView(
+                              child: ChapterPage(
+                                url: chp.content.urls[pgNum],
+                                s: chp.source,
+                                width: MediaQuery.of(context).size.width,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  })),
         ));
   }
 
