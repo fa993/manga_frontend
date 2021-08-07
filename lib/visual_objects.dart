@@ -760,10 +760,17 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
   double n(double dimension, double buttonDimension, double buttonSpacing) {
     double sum = buttonDimension;
     int i = 1;
+    //TODO optimize
     while (sum < dimension) {
       sum += buttonDimension + buttonSpacing;
       i++;
     }
+    /**
+     *
+     * double minus = dimension - buttonDimension;
+     * double x = minus / (buttonDimension + buttonSpacing)
+     * return x;
+     */
     return (i - 1).roundToDouble();
   }
 }
@@ -1034,6 +1041,28 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
           IconButton(icon: Icon(Icons.arrow_back), onPressed: () => this.widget.onRightToLeft.call()),
           IconButton(icon: Icon(Icons.arrow_downward), onPressed: () => this.widget.onUpToDown.call()),
         ],
+      ),
+    );
+  }
+}
+
+class ReaderPageInfoPanel extends StatelessWidget {
+
+  final String dateString;
+  final String batteryString;
+  final String pageInfo;
+
+  const ReaderPageInfoPanel({Key key, this.dateString, this.batteryString, this.pageInfo}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
+      color: Colors.black54,
+      child: Text(
+        (this.dateString + " " + this.batteryString + " " + this.pageInfo).trim(),
+        // _formatter.format(DateTime.now()) + " Battery: " + snapshot.data.toString() + "% " + this.pageInfo,
+        style: TextStyle(color: Colors.white),
       ),
     );
   }
