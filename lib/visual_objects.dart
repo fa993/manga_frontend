@@ -768,7 +768,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     /**
      *
      * double minus = dimension - buttonDimension;
-     * double x = minus / (buttonDimension + buttonSpacing)
+     * int x = minus ~/ (buttonDimension + buttonSpacing)
      * return x;
      */
     return (i - 1).roundToDouble();
