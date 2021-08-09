@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -722,7 +724,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     } else {
       int index = ((colNum * numOfChapsPerRow) + rowNum);
       print("Chap Clicked: " + (index + 1).toString());
-      this.widget.onClick.call(index).call(context);
+      // this.widget.onClick.call(index).call(context);
     }
   }
 
@@ -757,21 +759,10 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     );
   }
 
-  double n(double dimension, double buttonDimension, double buttonSpacing) {
-    double sum = buttonDimension;
-    int i = 1;
-    //TODO optimize
-    while (sum < dimension) {
-      sum += buttonDimension + buttonSpacing;
-      i++;
-    }
-    /**
-     *
-     * double minus = dimension - buttonDimension;
-     * int x = minus ~/ (buttonDimension + buttonSpacing)
-     * return x;
-     */
-    return (i - 1).roundToDouble();
+  int n(double dimension, double buttonDimension, double buttonSpacing) {
+    double minus = dimension - buttonDimension;
+    int x = minus ~/ (buttonDimension + buttonSpacing);
+    return x;
   }
 }
 
@@ -842,14 +833,10 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
     return false;
   }
 
-  double n(double dimension, double buttonDimension, double buttonSpacing) {
-    double sum = buttonDimension;
-    int i = 1;
-    while (sum < dimension) {
-      sum += buttonDimension + buttonSpacing;
-      i++;
-    }
-    return (i - 1).roundToDouble();
+  int n(double dimension, double buttonDimension, double buttonSpacing) {
+    double minus = dimension - buttonDimension;
+    int x = minus ~/ (buttonDimension + buttonSpacing);
+    return x;
   }
 }
 
@@ -1047,7 +1034,6 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
 }
 
 class ReaderPageInfoPanel extends StatelessWidget {
-
   final String dateString;
   final String batteryString;
   final String pageInfo;
@@ -1065,5 +1051,73 @@ class ReaderPageInfoPanel extends StatelessWidget {
         style: TextStyle(color: Colors.white),
       ),
     );
+  }
+}
+
+class SideWheel extends CustomPainter {
+  static const double length = 10;
+  static const double margin = 1;
+
+  final double currentRotationAngle;
+  final double yTouch;
+  final bool startFromLeft;
+  final double radius;
+
+  SideWheel({this.currentRotationAngle, this.startFromLeft, this.yTouch, this.radius});
+
+  Paint _wheelPaint = Paint()
+    ..color = Colors.black
+    ..style = PaintingStyle.fill;
+
+  Paint _linePaint = Paint()..color = Colors.white;
+
+  Offset _getPoint(Offset center, double radius, double degrees) {
+    double x = center.dx + _getX(radius, degrees);
+    double y = center.dy + _getY(radius, degrees);
+    return Offset(x, y);
+  }
+
+  double _getX(double radius, double degrees) {
+    return radius * cos(_degreeToRadians(degrees));
+  }
+
+  double _getY(double radius, double degrees) {
+    return radius * sin(_degreeToRadians(degrees));
+  }
+
+  double _degreeToRadians(double degrees) {
+    return degrees * pi / 180;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Offset center = Offset(startFromLeft ? 0 : radius, yTouch);
+    canvas.drawCircle(center, radius, _wheelPaint);
+    // canvas.drawArc(Rect.fromCenter(center: center, width: size.width, height: size.height), startFromLeft ? -pi / 2 : pi / 2, startFromLeft ? -pi : pi, true, _wheelPaint);
+    double diff = currentRotationAngle - currentRotationAngle.floor();
+    if (startFromLeft) {
+      int lower = -90;
+      while (lower <= 90) {
+        canvas.drawLine(_getPoint(center, radius - length - margin, lower.toDouble() + diff), _getPoint(center, radius - margin, lower.toDouble() + diff), _linePaint);
+        lower += 8;
+      }
+    } else {
+      int lower = -180;
+      while(lower <= -90){
+        canvas.drawLine(_getPoint(center, radius - length - margin, lower.toDouble() + diff), _getPoint(center, radius - margin, lower.toDouble() + diff), _linePaint);
+        lower += 8;
+      }
+      lower = 90;
+      while(lower <= 180){
+        canvas.drawLine(_getPoint(center, radius - length - margin, lower.toDouble() + diff), _getPoint(center, radius - margin, lower.toDouble() + diff), _linePaint);
+        lower += 8;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    SideWheel old = oldDelegate as SideWheel;
+    return !(old.currentRotationAngle == this.currentRotationAngle && old.startFromLeft == this.startFromLeft && old.yTouch == this.yTouch);
   }
 }

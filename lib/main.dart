@@ -556,56 +556,34 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
       return SizedBox(width: 30, height: 30, child: CenteredFixedCircle());
     } else {
       return Scaffold(
-          backgroundColor: Colors.black,
-          body: NestedScrollView(
-            controller: _sc,
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverAppBar(
-                  title: Text(_mn.title),
-                  expandedHeight: MediaQuery.of(context).size.height,
-                  pinned: true,
-                  flexibleSpace: FlexibleSpaceBar(
-                    titlePadding: EdgeInsets.all(16.0),
-                    //TODO think about this because title text also becomes invisible
-                    background: Container(
-                      color: Colors.black,
-                      child: CachedNetworkImage(
-                        imageUrl: _mn.coverURL,
-                        fit: BoxFit.fitWidth,
-                      ),
+        backgroundColor: Colors.black,
+        body: NestedScrollView(
+          controller: _sc,
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverAppBar(
+                title: Text(_mn.title),
+                expandedHeight: MediaQuery.of(context).size.height,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  titlePadding: EdgeInsets.all(16.0),
+                  //TODO think about this because title text also becomes invisible
+                  background: Container(
+                    color: Colors.black,
+                    child: CachedNetworkImage(
+                      imageUrl: _mn.coverURL,
+                      fit: BoxFit.fitWidth,
                     ),
                   ),
                 ),
-              ];
-            },
-            body: MangaPage(
-              manga: _mn,
-            ),
-          )
-          // body: CustomScrollView(
-          //   controller: _sc,
-          //   slivers: [
-          //     SliverAppBar(
-          //       title: Text(_mn.title),
-          //       expandedHeight: MediaQuery.of(context).size.height,
-          //       pinned: true,
-          //       flexibleSpace: FlexibleSpaceBar(
-          //           titlePadding: EdgeInsets.all(16.0),
-          //           background: CachedNetworkImage(
-          //             imageUrl: _mn.coverURL,
-          //             fit: BoxFit.cover,
-          //           )),
-          //     ),
-          //     MangaPage(
-          //       manga: _mn,
-          //     ),
-          //     // Widgeter.getMangaPage(_mn, _expanded, setExpanded, (t) {
-          //     //   Navigator.pushNamed(context, "/read", arguments: APIer.fetchChapter(t.id));
-          //     // })
-          //   ],
-          // ),
-          );
+              ),
+            ];
+          },
+          body: MangaPage(
+            manga: _mn,
+          ),
+        ),
+      );
     }
   }
 }
@@ -631,13 +609,20 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   static final DateFormat _formatter = DateFormat.jm();
   static final Battery _battery = Battery();
 
-  TransformationController _transformationController = TransformationController();
+  static const int thresholdForWheelPopOut = 30;
+  static const double wheelRadius = 40.0;
+
   bool _visible = false;
   RestartableTimer _timer;
-  AnimationController _animationController;
-  PageController _pageController;
-  ItemScrollController _scrollController;
-  ItemPositionsListener _scrollListener;
+  AnimationController _animationControllerForAppBar;
+
+  double _currentWheelRotation = 0;
+
+  // PageController _pageController;
+  // ItemScrollController _scrollController;
+  // ItemPositionsListener _scrollListener;
+
+  ScrollSynchronizer _synchronizer;
 
   int _formalIndexAtStartOfCurrentChapter = 0;
   int _formalIndexForList = 0;
@@ -650,7 +635,10 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   OverlayEntry _settings;
   LayerLink _link;
 
+  OverlayEntry _wheel;
+
   int _displayMode = _RIGHT_TO_LEFT;
+
   int _upperBoundIndex = -1;
 
   int _batteryLevel;
@@ -658,30 +646,40 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   int _currPage;
   int _currChapLength;
 
+  bool disposed = false;
+
   @override
   void initState() {
     super.initState();
     _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
     listenForInfo(_battery, Duration(seconds: 1));
-    _animationController = AnimationController(
+    _animationControllerForAppBar = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 200),
     );
     APIer.fetchChapterPageNumber(this.widget.current.mangaId, this.widget.current.chaps[this.widget.current.currentIndex].sequenceNumber).then((value) {
       _formalIndexAtStartOfCurrentChapter = (value);
       _formalIndexForList = _formalIndexAtStartOfCurrentChapter;
-      _pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
-      _pageController.addListener(() {
-        int index = _pageController.page.toInt();
-        _listen(index);
+      PageController pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
+      // _pageController.addListener(() {
+      //   int index = _pageController.page.toInt();
+      //   _listen(index);
+      // });
+      ItemScrollController scrollController = ItemScrollController();
+      ItemPositionsListener scrollListener = ItemPositionsListener.create();
+      // _scrollListener.itemPositions.addListener(() {
+      //   int index = _scrollListener.itemPositions.value.first.index;
+      //   _listen(index);
+      // });
+      _synchronizer = new ScrollSynchronizer();
+      _synchronizer.attachPageControllerToAll([_LEFT_TO_RIGHT, _RIGHT_TO_LEFT], pageController);
+      _synchronizer.attachListController(_UP_TO_DOWN, scrollController, scrollListener);
+
+      _synchronizer.listen((t) {
+        _listen(t.getIndex());
       });
-      _scrollController = ItemScrollController();
-      _scrollListener = ItemPositionsListener.create();
-      _scrollListener.itemPositions.addListener(() {
-        int index = _scrollListener.itemPositions.value.first.index;
-        _listen(index);
-      });
+
       assembleProper(_formalIndexAtStartOfCurrentChapter);
     });
   }
@@ -721,7 +719,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
       _requestedNextChapterLoadIndex = plusOne;
       populateChapter(plusOne).then((value) {
-        int fps = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
+        int fps = chapStart + _chapIndexToChapter[chapIndex].content.urls.length;
         setState(() {
           addProper(_chapStarts, fps);
           _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
@@ -731,7 +729,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     if (minusOne > -1 && !_chapIndexToChapter.containsKey(minusOne) && _requestedPreviousChapterLoadIndex != minusOne) {
       _requestedPreviousChapterLoadIndex = minusOne;
       populateChapter(minusOne).then((value) {
-        int fps = findChapStart(index) - value.content.urls.length;
+        int fps = chapStart - value.content.urls.length;
         setState(() {
           addProper(_chapStarts, fps);
           _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
@@ -739,7 +737,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
       });
     }
     if (plusOne == this.widget.current.chaps.length) {
-      _upperBoundIndex = findChapStart(index) + _chapIndexToChapter[chapIndex].content.urls.length;
+      _upperBoundIndex = chapStart + _chapIndexToChapter[chapIndex].content.urls.length;
     }
     int nCurr = index - chapStart + 1;
     int nLen = _chapIndexToChapter[chapIndex].content.urls.length;
@@ -833,7 +831,61 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     sortedList.insert(min, add);
   }
 
+  void toggleScrollWheel(LongPressStartDetails deets) {
+    if (_wheel == null) {
+      bool b1;
+      if (deets.localPosition.dx <= thresholdForWheelPopOut) {
+        b1 = true;
+      } else if (deets.localPosition.dx >= MediaQuery.of(context).size.width - thresholdForWheelPopOut) {
+        b1 = false;
+      } else {
+        return;
+      }
+      initWheel(b1, deets.localPosition.dy);
+      Overlay.of(context).insert(_wheel);
+    } else {
+      collapseWheel();
+    }
+  }
+
+  collapseWheel() {
+    _wheel.remove();
+    _wheel = null;
+  }
+
+  initWheel(bool isLeft, double yTouch) {
+    _wheel = OverlayEntry(builder: (context) {
+      return Positioned(
+        width: wheelRadius,
+        height: wheelRadius * 2,
+        left: isLeft ? 0 : null,
+        right: isLeft ? null: 0,
+        child: GestureDetector(
+          // onPanUpdate: handleWheelScrollUpdate,
+          // onPanEnd: ,
+          child: CustomPaint(
+            painter: SideWheel(
+              currentRotationAngle: _currentWheelRotation,
+              startFromLeft: isLeft,
+              yTouch: yTouch,
+              radius: wheelRadius,
+            ),
+            // size: Size(wheelRadius, wheelRadius * 2),
+          ),
+        ),
+      );
+    });
+  }
+
+  void handleWheelScrollUpdate(DragUpdateDetails deets) {
+    // deets.localPosition.direction
+  }
+
   void toggleTopBar() {
+    if (_wheel != null) {
+      collapseWheel();
+      return;
+    }
     _timer.cancel();
     if (!_visible) {
       expandTopBar();
@@ -862,7 +914,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   void onPressSettings(BuildContext context) {
     _timer.reset();
     if (_settings == null) {
-      initSettings(_settings);
+      initSettings();
       Overlay.of(context).insert(_settings);
     } else {
       _settings.remove();
@@ -870,7 +922,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     }
   }
 
-  void initSettings(OverlayEntry settings) {
+  void initSettings() {
     _settings = OverlayEntry(builder: (context) {
       return Positioned(
         height: this.widget.settingsHeight,
@@ -881,27 +933,23 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
           offset: Offset(0, 20),
           child: ReaderPageSettingsPanel(
             onLeftToRight: () {
-              if (_displayMode == _UP_TO_DOWN) {
-                _pageController = PageController(initialPage: _scrollListener.itemPositions.value.first.index, keepPage: false);
-                _pageController.addListener(() {
-                  int index = _pageController.page.toInt();
-                  _listen(index);
-                });
+              IndexedScrollController old;
+              if ((old = _synchronizer.get(_displayMode)) is! PageScrollController) {
+                PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
+                _synchronizer.get(_LEFT_TO_RIGHT).setUnderlyingController(controller);
               }
               setState(() => _displayMode = _LEFT_TO_RIGHT);
             },
             onRightToLeft: () {
-              if (_displayMode == _UP_TO_DOWN) {
-                _pageController = PageController(initialPage: _scrollListener.itemPositions.value.first.index, keepPage: false);
-                _pageController.addListener(() {
-                  int index = _pageController.page.toInt();
-                  _listen(index);
-                });
+              IndexedScrollController old;
+              if ((old = _synchronizer.get(_displayMode)) is! PageScrollController) {
+                PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
+                _synchronizer.get(_RIGHT_TO_LEFT).setUnderlyingController(controller);
               }
               setState(() => _displayMode = _RIGHT_TO_LEFT);
             },
             onUpToDown: () {
-              _formalIndexForList = _pageController.page.toInt();
+              _formalIndexForList = _synchronizer.get(_displayMode).getIndex();
               setState(() => _displayMode = _UP_TO_DOWN);
             },
           ),
@@ -913,32 +961,33 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   @override
   void dispose() {
     super.dispose();
+    this.disposed = true;
     _timer.cancel();
     if (_settings != null) {
       _settings.remove();
       Future.delayed(Duration(milliseconds: 100), () => _settings.dispose());
     }
-    _transformationController.dispose();
-    _animationController.dispose();
+    if (_wheel != null) {
+      _wheel.remove();
+      Future.delayed(Duration(milliseconds: 100), () => _wheel.dispose());
+    }
+    _synchronizer.dispose();
+    _animationControllerForAppBar.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     String displayName = "";
-    if (_pageController == null) {
+    if (_synchronizer == null) {
       return CenteredFixedCircle();
     }
-    int indexP = -1;
-    if (_pageController.hasClients) {
-      indexP = _pageController.page.toInt();
-    }
-    if (_scrollController.isAttached) {
-      indexP = _scrollListener.itemPositions.value.first.index;
-    }
-    int chapIndex = findChapIndex(indexP);
-    if (chapIndex > -1) {
-      CompleteChapter chp1 = _chapIndexToChapter[chapIndex];
-      displayName = chp1.dt.chapterNumber;
+    IndexedScrollController con = _synchronizer.get(_displayMode);
+    if (con.isInUse()) {
+      int chapIndex = findChapIndex(con.getIndex());
+      if (chapIndex > -1) {
+        CompleteChapter chp1 = _chapIndexToChapter[chapIndex];
+        displayName = chp1.dt.chapterNumber;
+      }
     }
     return Scaffold(
       backgroundColor: Colors.black,
@@ -954,18 +1003,19 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
             )
           ],
         ),
-        controller: _animationController,
+        controller: _animationControllerForAppBar,
         visible: _visible,
       ),
       body: GestureDetector(
-        onTapDown: (t) => toggleTopBar(),
+        onTap: () => toggleTopBar(),
+        onLongPressStart: (t) => toggleScrollWheel(t),
         child: Stack(
           children: [
             _displayMode == _UP_TO_DOWN
                 ? ScrollablePositionedList.builder(
                     initialScrollIndex: _formalIndexForList,
-                    itemPositionsListener: _scrollListener,
-                    itemScrollController: _scrollController,
+                    itemPositionsListener: _synchronizer.get(_displayMode).getUnderlyingListener() as ItemPositionsListener,
+                    itemScrollController: _synchronizer.get(_displayMode).getUnderlyingController() as ItemScrollController,
                     initialAlignment: 0,
                     //TODO point of failure
                     itemCount: _upperBoundIndex == -1 ? 100000 : _upperBoundIndex,
@@ -996,7 +1046,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                   )
                 : PageView.custom(
                     allowImplicitScrolling: true,
-                    controller: _pageController,
+                    controller: _synchronizer.get(_displayMode).getUnderlyingController() as PageController,
                     reverse: _displayMode == _RIGHT_TO_LEFT,
                     childrenDelegate: SliverChildBuilderDelegate((context, index) {
                       if (index == _upperBoundIndex) {
@@ -1042,6 +1092,153 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
         ),
       ),
     );
+  }
+}
+
+class ScrollSynchronizer {
+  Map<int, IndexedScrollController> _storage = LinkedHashMap();
+
+  void attachPageController(int marker, PageController controller) {
+    _storage[marker] = PageScrollController(controller);
+  }
+
+  void attachPageControllerToAll(List<int> markers, PageController controller) {
+    PageScrollController con = PageScrollController(controller);
+    markers.forEach((element) => _storage[element] = con);
+  }
+
+  void attachListController(int marker, ItemScrollController controller, ItemPositionsListener listener) {
+    _storage[marker] = ListScrollController(controller, listener);
+  }
+
+  IndexedScrollController get(int marker) {
+    return _storage[marker];
+  }
+
+  void listen(Function(IndexedScrollController) listener) {
+    this._storage.values.forEach((value) => value.listen(() => listener.call(value)));
+  }
+
+  void dispose() {
+    this._storage.values.forEach((value) => value.dispose());
+  }
+}
+
+abstract class IndexedScrollController {
+  int getIndex();
+
+  jumpTo(int index);
+
+  void listen(Function listener);
+
+  Object getUnderlyingController();
+
+  Object getUnderlyingListener();
+
+  void setUnderlyingController(Object controller);
+
+  bool isInUse();
+
+  void dispose();
+}
+
+class PageScrollController extends IndexedScrollController {
+  PageController _controller;
+
+  Set<Function> _listeners = HashSet();
+
+  PageScrollController(this._controller);
+
+  @override
+  int getIndex() {
+    return this._controller.page.toInt();
+  }
+
+  @override
+  PageController getUnderlyingController() {
+    return this._controller;
+  }
+
+  @override
+  ItemPositionsListener getUnderlyingListener() {
+    throw UnsupportedError("Doesn't make sense");
+  }
+
+  @override
+  void setUnderlyingController(Object controller) {
+    this._controller.dispose();
+    this._controller = controller as PageController;
+    _listeners.forEach((element) => this._controller.addListener(element));
+  }
+
+  @override
+  jumpTo(int index) {
+    this._controller.jumpToPage(index);
+  }
+
+  @override
+  bool isInUse() {
+    return this._controller.hasClients;
+  }
+
+  @override
+  void listen(Function listener) {
+    if (!_listeners.contains(listener)) {
+      _listeners.add(listener);
+      this._controller.addListener(listener);
+    }
+  }
+
+  @override
+  void dispose() {
+    this._controller.dispose();
+  }
+}
+
+class ListScrollController extends IndexedScrollController {
+  ItemScrollController _controller;
+  ItemPositionsListener _listener;
+
+  ListScrollController(this._controller, this._listener);
+
+  @override
+  int getIndex() {
+    return this._listener.itemPositions.value.first.index;
+  }
+
+  @override
+  ItemScrollController getUnderlyingController() {
+    return this._controller;
+  }
+
+  @override
+  ItemPositionsListener getUnderlyingListener() {
+    return this._listener;
+  }
+
+  @override
+  void setUnderlyingController(Object controller) {
+    throw UnsupportedError("This is ugly");
+  }
+
+  @override
+  bool isInUse() {
+    return this._controller.isAttached;
+  }
+
+  @override
+  jumpTo(int index) {
+    this._controller.jumpTo(index: index, alignment: 0);
+  }
+
+  @override
+  void listen(Function listener) {
+    this._listener.itemPositions.addListener(listener);
+  }
+
+  @override
+  void dispose() {
+    //do nothing
   }
 }
 
