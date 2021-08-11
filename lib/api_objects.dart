@@ -136,7 +136,11 @@ class DBer {
   static void add(MangaHeading mg) {
     _mangaDB.insert(
       _mangaTableName,
-      SavedManga.all().toMap(),
+      SavedManga.all(
+        id: mg.id,
+        name: mg.name,
+        coverURL: mg.coverURL,
+      ).toMap(),
       conflictAlgorithm: ConflictAlgorithm.rollback,
     );
   }
@@ -155,7 +159,7 @@ class DBer {
       //TODO test this
       int index1 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id1], columns: ['index']));
       int index2 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id2], columns: ['index']));
-      if(index2 < index1){
+      if (index2 < index1) {
         txn.rawUpdate('UPDATE $_mangaTableName set index = index + 1 where index >= ? AND index < ?', [index2, index1]);
         txn.rawUpdate('UPDATE $_mangaTableName set index = ? where saved_manga_id = ?', [index2, id1]);
       } else {
