@@ -3,10 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:manga_frontend/SavedManga.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart' as uuid;
 
 class APIer {
@@ -109,37 +108,91 @@ class APIer {
 }
 
 class DBer {
-  static Box<SavedManga> _fav;
-  static int _index;
+  static const _databaseName = "manga.db";
+  static const _mangaTableName = "saved_manga";
+
+  static Database _mangaDB;
 
   static void initializeDatabase() async {
-    await Hive.initFlutter();
-    Hive.registerAdapter(SavedMangaAdapter());
-    _fav = await Hive.openBox<SavedManga>("favourites");
-    _index = _fav.length;
+    _mangaDB = await openDatabase(
+      join(await getDatabasesPath(), _databaseName),
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE $_mangaTableName (saved_manga_id TEXT PRIMARY KEY, index INTEGER AUTOINCREMENT, name STRING, coverURL TEXT)',
+        );
+      },
+      version: 1,
+    );
   }
 
-  static Iterable<SavedManga> getAllSavedManga() {
-    return _fav.values;
-  }
-
-  static void _correctData() {
+  static Future<Iterable<SavedManga>> getAllSavedManga() {
+    return _mangaDB.query(_mangaTableName, orderBy: 'index ASC').then(
+          (value) => value.map(
+            (e) => SavedManga.all(index: e['index'], id: e['saved_manga_id'], coverURL: e['coverURL'], name: e['name']),
+          ),
+        );
   }
 
   static void add(MangaHeading mg) {
-    if(!_fav.containsKey(mg.id)) {
-      _fav.put(mg.id, SavedManga.all(id: mg.id, name: mg.name, coverURL: mg.coverURL, index: _index));
-      _index++;
-    }
+    _mangaDB.insert(
+      _mangaTableName,
+      SavedManga.all().toMap(),
+      conflictAlgorithm: ConflictAlgorithm.rollback,
+    );
   }
 
   static void remove(String id) {
-    _fav.delete(id);
+    _mangaDB.delete(
+      _mangaTableName,
+      where: 'saved_manga_id = ?',
+      whereArgs: [id],
+    );
   }
 
-  static void reorder(String id, int indexTo){
+  static void reorder(String id1, String id2) {
     //TODO
+    _mangaDB.transaction((txn) async {
+      //TODO test this
+      int index1 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id1], columns: ['index']));
+      int index2 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id2], columns: ['index']));
+      if(index2 < index1){
+        txn.rawUpdate('UPDATE $_mangaTableName set index = index + 1 where index >= ? AND index < ?', [index2, index1]);
+        txn.rawUpdate('UPDATE $_mangaTableName set index = ? where saved_manga_id = ?', [index2, id1]);
+      } else {
+        //index2 > index1
+        txn.rawUpdate('UPDATE $_mangaTableName set index = index - 1 where index >= ? AND index < ?', [index1, index2]);
+        txn.rawUpdate('UPDATE $_mangaTableName set index = ? where saved_manga_id = ?', [index2, id1]);
+      }
+    });
   }
+}
+
+class SavedManga {
+  String id;
+
+  int index;
+
+  String coverURL;
+
+  String name;
+
+  SavedManga();
+
+  SavedManga.all({this.id, this.index, this.coverURL, this.name});
+
+  Map<String, dynamic> toMap() {
+    return {
+      'saved_manga_id': this.id,
+      'name': this.name,
+      'coverURL': this.coverURL,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) => identical(this, other) || other is SavedManga && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class MangaHeading {

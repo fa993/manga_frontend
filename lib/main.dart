@@ -12,7 +12,6 @@ import 'package:intl/intl.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-import 'SavedManga.dart';
 import 'api_objects.dart';
 import 'visual_objects.dart';
 
@@ -256,9 +255,8 @@ class FavouritesPageWidget extends StatefulWidget {
 }
 
 class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
-  Map<int, SavedManga> _savedManga = {};
-
   List<Widget> _renderedManga = [];
+  List<SavedManga> _savedManga = [];
 
   @override
   void initState() {
@@ -267,18 +265,19 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
   }
 
   void reload() {
-    DBer.getAllSavedManga().forEach((element) => _savedManga[element.index] = element);
-    for (int i = 0, j = 0; i < _savedManga.length; i++, j++) {
-      if (_savedManga[j] != null) {
-        _savedManga[j].index = i;
-        _renderedManga.add(FavouriteManga(
-          name: _savedManga[j].name,
-          coverURL: _savedManga[j].coverURL,
-        ));
-      } else {
-        i--;
-      }
-    }
+    DBer.getAllSavedManga().then(
+      (value) {
+        _savedManga = value.toList();
+        value.map(
+          (e) => _renderedManga.add(
+            FavouriteManga(
+              name: e.name,
+              coverURL: e.coverURL,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -299,7 +298,14 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
           padding: EdgeInsets.all(16.0),
           child: ReorderableWrap(
             children: _renderedManga,
-            onReorder: (from, to) {},
+            onReorder: (from, to) {
+              String id1 = _savedManga[from].id;
+              String id2 = _savedManga[to].id;
+              SavedManga mg1 = _savedManga[from];
+              _savedManga[from] = _savedManga[to];
+              _savedManga[to] = mg1;
+              DBer.reorder(id1, id2);
+            },
           ),
         ),
       ),

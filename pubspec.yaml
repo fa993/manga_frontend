@@ -32,18 +32,17 @@ dependencies:
   transparent_image: ^2.0.0
   fullscreen: ^1.0.3
   cached_network_image: ^3.0.0
-  hive: ^2.0.4
-  hive_flutter: ^1.0.0
   uuid: ^3.0.4
   scrollable_positioned_list: ^0.1.10
   battery_plus: ^1.1.0
   intl: ^0.17.0
   reorderables: ^0.4.1
+  sqflite: ^2.0.0+3
+  path: ^1.8.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  hive_generator: ^1.1.0
   build_runner: ^2.0.3
 
 # For information on the generic Dart part of this file, see the
