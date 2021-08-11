@@ -9,23 +9,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import 'SavedManga.dart';
 import 'api_objects.dart';
-import 'manga_heading.dart';
 import 'visual_objects.dart';
 
 void main() {
   HttpOverrides.global = new DevHttpsOverides();
   DBer.initializeDatabase();
-  // MangaPageChapterButton.configureFunction((context, s, chaps, index) {
-  //   Navigator.pushNamed(context, "/read",
-  //       arguments: Chapters.all(
-  //         chaps: chaps,
-  //         s: s,
-  //         currentIndex: index,
-  //       ));
-  // });
   MangaPageChapterPanel.onClick = (c, t) => Navigator.pushNamed(c, "/read", arguments: t);
   runApp(MyApp());
 }
@@ -163,55 +156,55 @@ class HomePageWidget extends StatefulWidget {
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
-  List<MangaHeading> _hd = <MangaHeading>[];
-  ScrollController _sc = new ScrollController();
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _sc.addListener(() {
-      if (_sc.offset >= _sc.position.maxScrollExtent && !_sc.position.outOfRange) {
-        fetchMore();
-      }
-    });
-    fetchMore();
-  }
-
-  @override
-  void dispose() {
-    _sc.dispose();
-    super.dispose();
-  }
-
-  bool fetchMore([int limit = 10]) {
-    if (!_isLoading) {
-      startedLoading();
-      APIer.fetchHome(_hd.length, limit).then((value) {
-        _hd.addAll(value);
-        stoppedLoading();
-      });
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  void stoppedLoading() {
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  void startedLoading() {
-    setState(() {
-      _isLoading = true;
-    });
-  }
-
+  // List<MangaHeading> _hd = <MangaHeading>[];
+  // ScrollController _sc = new ScrollController();
+  // bool _isLoading = false;
+  //
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _sc.addListener(() {
+  //     if (_sc.offset >= _sc.position.maxScrollExtent && !_sc.position.outOfRange) {
+  //       fetchMore();
+  //     }
+  //   });
+  //   fetchMore();
+  // }
+  //
+  // @override
+  // void dispose() {
+  //   _sc.dispose();
+  //   super.dispose();
+  // }
+  //
+  // bool fetchMore([int limit = 10]) {
+  //   if (!_isLoading) {
+  //     startedLoading();
+  //     APIer.fetchHome(_hd.length, limit).then((value) {
+  //       _hd.addAll(value);
+  //       stoppedLoading();
+  //     });
+  //     return true;
+  //   } else {
+  //     return false;
+  //   }
+  // }
+  //
+  // void stoppedLoading() {
+  //   setState(() {
+  //     _isLoading = false;
+  //   });
+  // }
+  //
+  // void startedLoading() {
+  //   setState(() {
+  //     _isLoading = true;
+  //   });
+  // }
+  //
   Widget getMain(BuildContext context) {
     return CustomScrollView(
-      controller: _sc,
+      // controller: _sc,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -227,36 +220,30 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 })
           ],
         ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (buildContext, index) {
-              if (index == _hd.length) {
-                return CenteredFixedCircle();
-              } else {
-                return Widgeter.getHomePanel(_hd.elementAt(index));
-              }
-            },
-            childCount: _isLoading ? _hd.length + 1 : _hd.length,
-          ),
-        ),
-        // SliverFillRemaining(
-        //   hasScrollBody: false,
-        //   child: Container(
-        //     color: Colors.green,
+        // SliverList(
+        //   delegate: SliverChildBuilderDelegate(
+        //     (buildContext, index) {
+        //       if (index == _hd.length) {
+        //         return CenteredFixedCircle();
+        //       } else {
+        //         return Widgeter.getHomePanel(_hd.elementAt(index));
+        //       }
+        //     },
+        //     childCount: _isLoading ? _hd.length + 1 : _hd.length,
         //   ),
-        // )
+        // ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
-      if (_sc.position.maxScrollExtent == 0) {
-        print('Through callback');
-        fetchMore();
-      }
-    });
+    // WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
+    //   if (_sc.position.maxScrollExtent == 0) {
+    //     print('Through callback');
+    //     fetchMore();
+    //   }
+    // });
     return getMain(context);
   }
 }
@@ -269,74 +256,54 @@ class FavouritesPageWidget extends StatefulWidget {
 }
 
 class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
-  Map<int, MangaHeading> _hd;
+  Map<int, SavedManga> _savedManga = {};
+
+  List<Widget> _renderedManga = [];
 
   @override
   void initState() {
     super.initState();
-    setState(() {
-      _hd = HashMap();
-      // APIer.fetchFavourites().then((value) => DBer.putFavourites(value));
-    });
+    reload();
+  }
+
+  void reload() {
+    DBer.getAllSavedManga().forEach((element) => _savedManga[element.index] = element);
+    for (int i = 0, j = 0; i < _savedManga.length; i++, j++) {
+      if (_savedManga[j] != null) {
+        _savedManga[j].index = i;
+        _renderedManga.add(FavouriteManga(
+          name: _savedManga[j].name,
+          coverURL: _savedManga[j].coverURL,
+        ));
+      } else {
+        i--;
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          snap: false,
-          pinned: true,
-          floating: true,
-          expandedHeight: 200.0,
-          title: Text("Favourites"),
-        ),
-        SliverGrid(
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            childAspectRatio: 4,
-            crossAxisSpacing: 10.0,
-            mainAxisExtent: 10.0,
-            maxCrossAxisExtent: 250,
-          ),
-          delegate: SliverChildBuilderDelegate(
-            (buildContext, int index) {
-              if (_hd.containsKey(index)) {
-                return MangaThumbnail(
-                  hd: _hd[index],
-                );
-              } else {
-                return FutureBuilder(
-                  future: DBer.fetchFavouriteAt(index),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      _hd.putIfAbsent(index, snapshot.data);
-                      return MangaThumbnail(
-                        hd: snapshot.data,
-                      );
-                    } else if (snapshot.hasError) {
-                      return Widgeter.errorThumbnail();
-                    }
-                    return SizedBox();
-                  },
-                );
-              }
-            },
-            childCount: DBer.getFavouritesCount(),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Favourites"),
+        actions: [
+          IconButton(
+              icon: Icon(Icons.search),
+              onPressed: () {
+                Navigator.pushNamed(context, '/search');
+              })
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Container(
+          padding: EdgeInsets.all(16.0),
+          child: ReorderableWrap(
+            children: _renderedManga,
+            onReorder: (from, to) {},
           ),
         ),
-      ],
+      ),
     );
-    // return FutureBuilder(
-    //   future: _hd,
-    //   builder: (context, snapshot) {
-    //     if (snapshot.hasData) {
-    //       return Widgeter.getThumbnail(snapshot.data);
-    //     } else if (snapshot.hasError) {
-    //       return Widgeter.errorThumbnail();
-    //     }
-    //     return CircularProgressIndicator();
-    //   },
-    // );
   }
 }
 
@@ -428,6 +395,14 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
     }
   }
 
+  void onDismiss(MangaHeading hd, DismissDirection dir) {
+    if (dir == DismissDirection.startToEnd) {
+      DBer.add(hd);
+    } else if (dir == DismissDirection.endToStart) {
+      DBer.remove(hd.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
@@ -478,6 +453,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         return InkWell(
                           child: MangaThumbnail(
                             hd: _hd[index],
+                            onDismiss: (d) => onDismiss(_hd[index], d),
                           ),
                           onTap: () {
                             Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(_hd[index].id));
@@ -488,12 +464,6 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                     childCount: _finished ? _hd.length : _hd.length + 1,
                   ),
                 ),
-                // SliverFillRemaining(
-                //   hasScrollBody: false,
-                //   child: Container(
-                //     color: Colors.green,
-                //   ),
-                // )
               ],
             )));
   }
@@ -610,7 +580,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   static final Battery _battery = Battery();
 
   static const int thresholdForWheelPopOut = 30;
-  static const double wheelRadius = 40.0;
+  static const double wheelRadius = 80.0;
 
   bool _visible = false;
   RestartableTimer _timer;
@@ -636,6 +606,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   LayerLink _link;
 
   OverlayEntry _wheel;
+  Offset _center;
 
   int _displayMode = _RIGHT_TO_LEFT;
 
@@ -781,6 +752,9 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
           });
         });
       }
+      if (plusOne == this.widget.current.chaps.length) {
+        _upperBoundIndex = formalPageStart + value.content.urls.length;
+      }
     });
     int minusOne = this.widget.current.currentIndex - 1;
     if (minusOne > -1) {
@@ -834,10 +808,13 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   void toggleScrollWheel(LongPressStartDetails deets) {
     if (_wheel == null) {
       bool b1;
+      double width = MediaQuery.of(context).size.width;
       if (deets.localPosition.dx <= thresholdForWheelPopOut) {
         b1 = true;
-      } else if (deets.localPosition.dx >= MediaQuery.of(context).size.width - thresholdForWheelPopOut) {
+        _center = Offset(0, wheelRadius);
+      } else if (deets.localPosition.dx >= width - thresholdForWheelPopOut) {
         b1 = false;
+        _center = Offset(wheelRadius, wheelRadius);
       } else {
         return;
       }
@@ -853,21 +830,22 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     _wheel = null;
   }
 
-  initWheel(bool isLeft, double yTouch) {
+  initWheel(bool isLeft, double top) {
     _wheel = OverlayEntry(builder: (context) {
       return Positioned(
         width: wheelRadius,
         height: wheelRadius * 2,
         left: isLeft ? 0 : null,
-        right: isLeft ? null: 0,
+        right: isLeft ? null : 0,
+        top: top - wheelRadius,
         child: GestureDetector(
-          // onPanUpdate: handleWheelScrollUpdate,
+          onPanUpdate: handleWheelScrollUpdate,
           // onPanEnd: ,
           child: CustomPaint(
             painter: SideWheel(
               currentRotationAngle: _currentWheelRotation,
               startFromLeft: isLeft,
-              yTouch: yTouch,
+              center: _center,
               radius: wheelRadius,
             ),
             // size: Size(wheelRadius, wheelRadius * 2),
@@ -878,7 +856,14 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   }
 
   void handleWheelScrollUpdate(DragUpdateDetails deets) {
-    // deets.localPosition.direction
+    double newAngle = atan(deets.delta.dy - _center.dy / deets.delta.dx - _center.dx);
+    setState(() {
+      _currentWheelRotation = radiansToDegrees(newAngle + pi);
+    });
+  }
+
+  double radiansToDegrees(double radians) {
+    return radians * 180 / pi;
   }
 
   void toggleTopBar() {

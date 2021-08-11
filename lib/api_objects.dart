@@ -6,9 +6,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:manga_frontend/SavedManga.dart';
 import 'package:uuid/uuid.dart' as uuid;
-
-import 'manga_heading.dart';
 
 class APIer {
   static String _serverURL = "https://192.168.29.227:8080";
@@ -98,7 +97,7 @@ class APIer {
   static ChapterContent doParseChapter(String response) {
     return ChapterContent.fromJSON(jsonDecode(response));
   }
-  
+
   static Future<int> fetchChapterPageNumber(String mangaId, int sequenceNumber) async {
     final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/findIndex/" + mangaId + "/" + sequenceNumber.toString()));
     if (response.statusCode != HttpStatus.ok) {
@@ -110,66 +109,70 @@ class APIer {
 }
 
 class DBer {
-  static LazyBox<MangaHeading> _fav;
+  static Box<SavedManga> _fav;
   static int _index;
 
   static void initializeDatabase() async {
     await Hive.initFlutter();
-    _fav = await Hive.openLazyBox<MangaHeading>("favourites");
-    Hive.registerAdapter(MangaHeadingAdapter());
-  }
-
-  static Future<MangaHeading> fetchFavouriteAt(int index) {
-    return _fav.get(index);
-  }
-
-  static int getFavouritesCount() {
-    return _fav.length;
-  }
-
-  static void addFavourite(MangaHeading hd) {
-    _fav.put(_index++, hd);
-  }
-
-  static void putFavourites(List<IndexedMangaHeading> hd) {
-    hd.forEach((element) {
-      _fav.put(element.index, element.heading);
-    });
+    Hive.registerAdapter(SavedMangaAdapter());
+    _fav = await Hive.openBox<SavedManga>("favourites");
     _index = _fav.length;
   }
 
-  static void switchOrder(int index1, int index2) async {
-    MangaHeading h1 = await _fav.get(index1);
-    MangaHeading h2 = await _fav.get(index2);
-    _fav.put(index1, h2);
-    _fav.put(index2, h1);
+  static Iterable<SavedManga> getAllSavedManga() {
+    return _fav.values;
+  }
+
+  static void _correctData() {
+  }
+
+  static void add(MangaHeading mg) {
+    if(!_fav.containsKey(mg.id)) {
+      _fav.put(mg.id, SavedManga.all(id: mg.id, name: mg.name, coverURL: mg.coverURL, index: _index));
+      _index++;
+    }
+  }
+
+  static void remove(String id) {
+    _fav.delete(id);
+  }
+
+  static void reorder(String id, int indexTo){
+    //TODO
   }
 }
 
-// class Manga {
-//
-//   String _id;
-//
-//   String _linkedId;
-//
-//   String _name;
-//
-//   String _coverURL;
-//
-//   String _url;
-//
-//   MangaMetadata _metadata;
-//   Source _source;
-//
-// }
-//
-// class MangaMetadata {
-//
-// }
-//
-// class Source {
-//
-// }
+class MangaHeading {
+  String id;
+
+  String name;
+
+  String coverURL;
+
+  String description;
+
+  String allGenres;
+
+  MangaHeading();
+
+  MangaHeading.all({this.id, this.name, this.coverURL, this.description, this.allGenres});
+
+  factory MangaHeading.fromJSON(Map<String, dynamic> json) {
+    return MangaHeading.all(
+      id: json['id'],
+      name: json['name'],
+      coverURL: json['coverURL'],
+      description: json['smallDescription'],
+      allGenres: json['genres'],
+    );
+  }
+
+  @override
+  int get hashCode => this.id.hashCode;
+
+  @override
+  bool operator ==(other) => other is MangaHeading && (other.id == this.id);
+}
 
 class IndexedMangaHeading {
   MangaHeading heading;
@@ -428,7 +431,6 @@ class CompleteChapter {
 }
 
 class Chapters {
-
   String mangaId;
   Map<int, ChapterData> chaps;
   Source s;

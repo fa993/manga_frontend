@@ -6,8 +6,6 @@ import 'package:flutter/rendering.dart';
 import 'package:manga_frontend/api_objects.dart';
 import 'package:transparent_image/transparent_image.dart';
 
-import 'manga_heading.dart';
-
 class Widgeter {
   static double imgHeight = 200;
   static double imgWidth = 128.6;
@@ -33,388 +31,51 @@ class Widgeter {
     width: imgWidth,
     alignment: Alignment.centerLeft,
   );
-
-  // static Widget getThumbnail(MangaHeading hd) {
-  //   return Container(
-  //       margin: EdgeInsets.all(edgeSpace),
-  //       padding: EdgeInsets.all(edgeSpace),
-  //       foregroundDecoration: BoxDecoration(border: Border.all(color: Colors.green)),
-  //       child: Column(
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         mainAxisSize: MainAxisSize.min,
-  //         children: [
-  //           Flexible(
-  //               fit: FlexFit.loose,
-  //               child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-  //                 CachedNetworkImage(
-  //                   imageUrl: hd.coverURL,
-  //                   height: imgHeight,
-  //                   width: imgWidth,
-  //                   alignment: Alignment.centerLeft,
-  //                   placeholder: (context, url) => img,
-  //                 ),
-  //                 SizedBox(
-  //                   width: gapSpace,
-  //                 ),
-  //                 Flexible(
-  //                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-  //                   Container(
-  //                       height: imgHeight - gapSpace,
-  //                       child: Text(
-  //                         hd.description,
-  //                         style: TextStyle(
-  //                           color: Colors.white,
-  //                           fontSize: descriptionFontSize,
-  //                           fontFamily: fontFamily,
-  //                           decoration: TextDecoration.none,
-  //                         ),
-  //                         maxLines: 12,
-  //                         overflow: TextOverflow.fade,
-  //                       )),
-  //                   Text(
-  //                     hd.allgenres,
-  //                     style: TextStyle(
-  //                       color: Colors.white,
-  //                       fontSize: genreFontSize,
-  //                       fontFamily: fontFamily,
-  //                       decoration: TextDecoration.none,
-  //                     ),
-  //                     softWrap: true,
-  //                     overflow: TextOverflow.ellipsis,
-  //                     maxLines: 1,
-  //                   )
-  //                 ])),
-  //               ])),
-  //           SizedBox(height: gapSpace),
-  //           Text(
-  //             hd.name,
-  //             style: TextStyle(
-  //               color: Colors.white,
-  //               fontSize: nameFontSize,
-  //               fontFamily: fontFamily,
-  //               decoration: TextDecoration.none,
-  //             ),
-  //             overflow: TextOverflow.ellipsis,
-  //           ),
-  //         ],
-  //       ));
-  // }
-
-  static Widget errorThumbnail() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Expanded(
-          child: Image.memory(kTransparentImage),
-        ),
-        Text("Error"),
-      ],
-    );
-  }
-
-  // static Widget getHeading(String heading) {
-  //   return Container(
-  //     child: Text(
-  //       heading,
-  //       style: TextStyle(
-  //         fontSize: 16.0,
-  //         color: Colors.black,
-  //       ),
-  //     ),
-  //     alignment: Alignment.centerLeft,
-  //     margin: EdgeInsets.fromLTRB(25, 25, 0, 0),
-  //   );
-  // }
-
-  static Widget getHomePanel(MangaHeading hd) {
-    return Container(
-      child: Text("Home: " + hd.name),
-    );
-  }
-
-// static Widget errorHomePanel() {
-//   return Container(
-//     child: Text("Internal App Error"),
-//   );
-// }
-//
-// static SliverList getMangaPage(CompleteManga mg, int expanded, void Function(int) setExpanded, Function(ChapterData) onPress) {
-//   return SliverList(
-//     delegate: SliverChildBuilderDelegate((context, index) {
-//       if (index.isOdd) {
-//         return SizedBox(
-//           height: 30,
-//         );
-//       }
-//       if (index > 6) {
-//         return composeLinkedChapterPanels(context, mg.linkedMangas[((index - 6) / 2).floor() - 1].source, mg.linkedMangas[((index - 6) / 2).floor() - 1].chapters, expanded, setExpanded, index, onPress);
-//       }
-//       switch (index) {
-//         case 0:
-//           return composeGenres(mg.genres);
-//         case 2:
-//           return composeDescription(mg.description);
-//         case 4:
-//           return composeButtonPanel();
-//         case 6:
-//           return composeMainChapterPanel(context, mg.source, mg.chapters, expanded, setExpanded, 0, onPress);
-//         default:
-//           return SizedBox(
-//             height: 30,
-//           );
-//       }
-//     }, childCount: 8 + mg.linkedMangas.length * 2),
-//   );
-// }
-//
-// static Widget composeGenres(List<Genre> genres) {
-//   return Container(
-//       alignment: Alignment.center,
-//       child: Text(
-//         genres.map((e) => e.name[0].toUpperCase() + e.name.substring(1)).reduce((value, element) => value += ", " + element),
-//         style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontSize: mangaPageGenresFontSize),
-//       ));
-// }
-//
-// static Widget composeDescription(String description) {
-//   return Text(
-//     description,
-//     style: TextStyle(color: Colors.white, fontFamily: fontFamily, fontSize: mangaPageDescriptionFontSize),
-//   );
-// }
-//
-// static Widget composeButtonPanel() {
-//   return SizedBox(
-//     height: 30,
-//   );
-// }
-//
-// static Widget composeMainChapterPanel(BuildContext context, Source s, Map<int, ChapterData> mData, int expanded, void Function(int) setExpanded, int index, Function(ChapterData) onPress) {
-//   return Column(
-//     mainAxisSize: MainAxisSize.min,
-//     crossAxisAlignment: CrossAxisAlignment.start,
-//     children: [
-//       Container(
-//         alignment: Alignment.centerLeft,
-//         child: TextButton(
-//           child: Text(
-//             s.name,
-//             style: TextStyle(fontFamily: fontFamily, color: Colors.green, fontSize: mangaPageChapterPanelExpansionButtonHeight),
-//           ),
-//           onPressed: () {
-//             if (expanded == index) {
-//               expanded = -1;
-//             } else {
-//               expanded = index;
-//             }
-//             setExpanded.call(expanded);
-//           },
-//         ),
-//       ),
-//       expanded == index ? _chapterGrid(context, mData, onPress) : _chapterList(mData, onPress),
-//     ],
-//   );
-// }
-//
-// static Widget composeLinkedChapterPanels(BuildContext context, Source s, Map<int, ChapterData> mData, int expanded, void Function(int) setExpanded, int index, Function(ChapterData) onPress) {
-//   return Column(
-//     mainAxisSize: MainAxisSize.min,
-//     crossAxisAlignment: CrossAxisAlignment.start,
-//     children: [
-//       Container(
-//         alignment: Alignment.centerLeft,
-//         child: TextButton(
-//           child: Text(
-//             s.name,
-//             style: TextStyle(fontFamily: fontFamily, color: Colors.green, fontSize: mangaPageChapterPanelExpansionButtonHeight),
-//           ),
-//           onPressed: () {
-//             if (expanded == index) {
-//               expanded = -1;
-//             } else {
-//               expanded = index;
-//             }
-//             setExpanded.call(expanded);
-//           },
-//         ),
-//       ),
-//       expanded == index ? _chapterGrid(context, mData, onPress) : _chapterList(mData, onPress),
-//     ],
-//   );
-// }
-//
-// static Widget _chapterList(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return Container(
-//     height: mangaPageChapterButtonHeight,
-//     child: _chapterListView(mData, onPress),
-//   );
-// }
-//
-// static Widget _chapterGrid(BuildContext context, Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return ConstrainedBox(
-//     constraints: BoxConstraints(
-//       maxHeight: MediaQuery.of(context).size.height / 2,
-//     ),
-//     // height: min(MediaQuery.of(context).size.height / 2, mangaPageChapterButtonHeight * (mData.length / (MediaQuery.of(context).size.width / (mangaPageChapterButtonWidth + mangaPageChapterGridSpacingWidth)).floor()).ceil()),
-//     child: _chapterGridView(mData, onPress),
-//   );
-// }
-//
-// static ListView _chapterListView(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return ListView.separated(
-//     itemBuilder: _chapterItemBuilder(mData, onPress),
-//     scrollDirection: Axis.horizontal,
-//     itemCount: mData.length,
-//     separatorBuilder: (context, index) {
-//       return SizedBox(
-//         width: mangaPageChapterGridSpacingWidth,
-//       );
-//     },
-//   );
-// }
-//
-// static GridView _chapterGridView(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return GridView.builder(
-//     gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-//       maxCrossAxisExtent: mangaPageChapterButtonWidth,
-//       mainAxisExtent: mangaPageChapterButtonHeight,
-//       mainAxisSpacing: mangaPageChapterGridSpacingHeight,
-//       crossAxisSpacing: mangaPageChapterGridSpacingWidth,
-//     ),
-//     itemBuilder: _chapterItemBuilder(mData, onPress),
-//     itemCount: mData.length,
-//     padding: EdgeInsets.all(0.0),
-//     shrinkWrap: true,
-//   );
-// }
-//
-// static Function _chapterItemBuilder(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return (context, index) {
-//     return _chapterWidget(mData[index], onPress);
-//   };
-// }
-//
-// static Widget _chapterWidget(ChapterData chp, Function(ChapterData) onPress) {
-//   return Container(
-//     child: OutlinedButton(
-//       style: ButtonStyle(side: MaterialStateProperty.all(BorderSide(color: Colors.white))),
-//       child: Text(
-//         chp.chapterNumber == null || chp.chapterNumber.isEmpty ? chp.chapterName : chp.chapterNumber,
-//         softWrap: true,
-//         maxLines: 1,
-//         overflow: TextOverflow.ellipsis,
-//         style: TextStyle(color: Colors.white, fontFamily: fontFamily),
-//       ),
-//       onPressed: () {
-//         onPress.call(chp);
-//       },
-//     ),
-//   );
-// }
-//
-// static Widget chapterImage(String url) {
-//   return InteractiveViewer(
-//       child: Center(
-//           child: CachedNetworkImage(
-//     // httpHeaders: {"Referer": "https://manganelo.com/"},
-//     imageUrl: url,
-//     placeholder: (context, x) {
-//       return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
-//     },
-//   )));
-// }
-//
-// static Widget _chapterListGrid(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return Container(
-//     height: mangaPageChapterButtonHeight,
-//     child: _chapterListGridView(mData, onPress),
-//   );
-// }
-//
-// static Widget _chapterListGridView(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return GridView.builder(
-//     scrollDirection: Axis.horizontal,
-//     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-//       mainAxisExtent: mangaPageChapterButtonWidth,
-//       mainAxisSpacing: mangaPageChapterGridSpacingWidth,
-//       crossAxisSpacing: mangaPageChapterGridSpacingHeight,
-//       crossAxisCount: 1,
-//       // childAspectRatio: mangaPageChapterButtonHeight / mangaPageChapterButtonWidth
-//     ),
-//     itemBuilder: _chapterItemBuilder(mData, onPress),
-//     itemCount: mData.length,
-//     padding: EdgeInsets.all(0.0),
-//     shrinkWrap: true,
-//   );
-// }
-//
-// static Widget _chapterTable(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   return Table(children: _chapterTableRow(mData, onPress));
-// }
-//
-// static List<TableRow> _chapterTableRow(Map<int, ChapterData> mData, Function(ChapterData) onPress) {
-//   int num = 5;
-//   int x = (mData.length / num).ceil();
-//   List<TableRow> ret = [];
-//   List<Widget> childs = [];
-//   for (int i = 1; i <= mData.length; i++) {
-//     childs.add(_chapterWidget(mData[i - 1], onPress));
-//     if (i % num == 0) {
-//       ret.add(TableRow(
-//         children: childs,
-//       ));
-//       childs = [];
-//     }
-//   }
-//   if (childs.isNotEmpty) {
-//     int f = childs.length;
-//     for (int i = f; i < num; i++) {
-//       childs.add(SizedBox());
-//     }
-//     ret.add(TableRow(
-//       children: childs,
-//     ));
-//   }
-//   return ret;
-// }
 }
 
 class MangaThumbnail extends StatelessWidget {
   final MangaHeading hd;
+  final Function(DismissDirection) onDismiss;
 
-  const MangaThumbnail({Key key, this.hd}) : super(key: key);
+  const MangaThumbnail({Key key, this.hd, this.onDismiss}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-        key: ObjectKey(hd.id),
-        confirmDismiss: (d) {
-          return Future.value(false);
-        },
-        child: Container(
-            margin: EdgeInsets.all(Widgeter.edgeSpace),
-            padding: EdgeInsets.all(Widgeter.edgeSpace),
-            foregroundDecoration: BoxDecoration(border: Border.all(color: Colors.green)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                    fit: FlexFit.loose,
-                    child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      CachedNetworkImage(
-                        imageUrl: hd.coverURL,
-                        height: Widgeter.imgHeight,
-                        width: Widgeter.imgWidth,
-                        alignment: Alignment.centerLeft,
-                        placeholder: (context, url) => Widgeter.img,
-                      ),
-                      SizedBox(
-                        width: Widgeter.gapSpace,
-                      ),
-                      Flexible(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      key: ObjectKey(hd.id),
+      confirmDismiss: (d) {
+        onDismiss.call(d);
+        return Future.value(false);
+      },
+      child: Container(
+        margin: EdgeInsets.all(Widgeter.edgeSpace),
+        padding: EdgeInsets.all(Widgeter.edgeSpace),
+        foregroundDecoration: BoxDecoration(border: Border.all(color: Colors.green)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              fit: FlexFit.loose,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: hd.coverURL,
+                    height: Widgeter.imgHeight,
+                    width: Widgeter.imgWidth,
+                    alignment: Alignment.centerLeft,
+                    placeholder: (context, url) => Widgeter.img,
+                  ),
+                  SizedBox(
+                    width: Widgeter.gapSpace,
+                  ),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Container(
                             height: Widgeter.imgHeight - Widgeter.gapSpace,
                             child: Text(
@@ -429,7 +90,7 @@ class MangaThumbnail extends StatelessWidget {
                               overflow: TextOverflow.fade,
                             )),
                         Text(
-                          hd.allgenres,
+                          hd.allGenres,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: Widgeter.genreFontSize,
@@ -440,21 +101,27 @@ class MangaThumbnail extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         )
-                      ])),
-                    ])),
-                SizedBox(height: Widgeter.gapSpace),
-                Text(
-                  hd.name,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: Widgeter.nameFontSize,
-                    fontFamily: Widgeter.fontFamily,
-                    decoration: TextDecoration.none,
+                      ],
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            )));
+                ],
+              ),
+            ),
+            SizedBox(height: Widgeter.gapSpace),
+            Text(
+              hd.name,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: Widgeter.nameFontSize,
+                fontFamily: Widgeter.fontFamily,
+                decoration: TextDecoration.none,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -523,8 +190,6 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 
   static int _expandedIndex = -1;
 
-  // double _gridHeight = 0;
-
   void switchDisplayMode() {
     setState(() {
       if (this.widget.expandedIndex == _expandedIndex) {
@@ -539,10 +204,6 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   void initState() {
     super.initState();
     _expandedIndex = -1;
-    // _gridHeight = min(
-    //     MediaQuery.of(context).size.height / 2,
-    //     Widgeter.mangaPageChapterButtonHeight * (this.widget.chaps.length.roundToDouble() / n(MediaQuery.of(context).size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth)).ceil()
-    // );
   }
 
   Function onClick(int index) {
@@ -583,42 +244,6 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   }
 }
 
-// class MangaPageChapterPanel extends StatelessWidget {
-//   static double mangaPageChapterPanelExpansionButtonHeight = 14.0;
-//
-//   final Map<int, ChapterData> chaps;
-//   final Source s;
-//   final bool displayModeIsGrid;
-//   final Function onExpansion;
-//
-//   const MangaPageChapterPanel({Key key, this.chaps, this.s, this.displayModeIsGrid, this.onExpansion}) : super(key: key);
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Column(
-//       mainAxisSize: MainAxisSize.min,
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         Container(
-//           alignment: Alignment.centerLeft,
-//           child: TextButton(
-//             child: Text(
-//               s.name,
-//               style: TextStyle(fontFamily: Widgeter.fontFamily, color: Colors.green, fontSize: mangaPageChapterPanelExpansionButtonHeight),
-//             ),
-//             onPressed: () {
-//               this.onExpansion.call();
-//             },
-//           ),
-//         ),
-//         this.displayModeIsGrid
-//             ? MangaPageChapterGrid(chaps: this.chaps)
-//             : MangaPageChapterList(chaps: this.chaps,),
-//       ],
-//     );
-//   }
-// }
-
 class MangaPageChapterList extends StatelessWidget {
   final Function onClick;
   final Map<int, ChapterData> chaps;
@@ -647,42 +272,6 @@ class MangaPageChapterList extends StatelessWidget {
     );
   }
 }
-
-// class MangaPageChapterGrid extends StatelessWidget {
-//   final Map<int, ChapterData> chaps;
-//   final Source s;
-//
-//   const MangaPageChapterGrid({Key key, this.chaps, this.s}) : super(key: key);
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return ConstrainedBox(
-//       constraints: BoxConstraints(
-//         maxHeight: MediaQuery.of(context).size.height / 2,
-//       ),
-//       // height: this.height,
-//       child: GridView.builder(
-//         gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-//           maxCrossAxisExtent: Widgeter.mangaPageChapterButtonWidth,
-//           mainAxisExtent: Widgeter.mangaPageChapterButtonHeight,
-//           mainAxisSpacing: Widgeter.mangaPageChapterGridSpacingHeight,
-//           crossAxisSpacing: Widgeter.mangaPageChapterGridSpacingWidth,
-//         ),
-//         itemBuilder: (context, index) {
-//           return MangaPageChapterButton(
-//             allChaps: chaps,
-//             displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
-//             s: s,
-//             index: index,
-//           );
-//         },
-//         itemCount: chaps.length,
-//         padding: EdgeInsets.all(0.0),
-//         shrinkWrap: true,
-//       ),
-//     );
-//   }
-// }
 
 class MangaPageCustomChapterGrid extends StatefulWidget {
   final Function onClick;
@@ -799,8 +388,6 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
     // int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
     int startIndex = numOfChapsPerRow * rowsScrolled;
     int rowsThatCanBeDisplayed = n(viewportHeight, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil() + 1 + 1;
-    // double leftOffsetMain = (size.width - (numOfChapsPerRow * Widgeter.mangaPageChapterButtonWidth + (numOfChapsPerRow - 1) * Widgeter.mangaPageChapterGridSpacingWidth)) / 2;
-    // int startIndex = 0;
     double offsetAtThatRow = rowsScrolled * (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight);
     double top = offsetAtThatRow;
     for (int i = 0; i < rowsThatCanBeDisplayed; i++) {
@@ -1059,11 +646,11 @@ class SideWheel extends CustomPainter {
   static const double margin = 1;
 
   final double currentRotationAngle;
-  final double yTouch;
+  final Offset center;
   final bool startFromLeft;
   final double radius;
 
-  SideWheel({this.currentRotationAngle, this.startFromLeft, this.yTouch, this.radius});
+  SideWheel({this.currentRotationAngle, this.startFromLeft, this.center, this.radius});
 
   Paint _wheelPaint = Paint()
     ..color = Colors.black
@@ -1091,7 +678,6 @@ class SideWheel extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    Offset center = Offset(startFromLeft ? 0 : radius, yTouch);
     canvas.drawCircle(center, radius, _wheelPaint);
     // canvas.drawArc(Rect.fromCenter(center: center, width: size.width, height: size.height), startFromLeft ? -pi / 2 : pi / 2, startFromLeft ? -pi : pi, true, _wheelPaint);
     double diff = currentRotationAngle - currentRotationAngle.floor();
@@ -1103,12 +689,12 @@ class SideWheel extends CustomPainter {
       }
     } else {
       int lower = -180;
-      while(lower <= -90){
+      while (lower <= -90) {
         canvas.drawLine(_getPoint(center, radius - length - margin, lower.toDouble() + diff), _getPoint(center, radius - margin, lower.toDouble() + diff), _linePaint);
         lower += 8;
       }
       lower = 90;
-      while(lower <= 180){
+      while (lower <= 180) {
         canvas.drawLine(_getPoint(center, radius - length - margin, lower.toDouble() + diff), _getPoint(center, radius - margin, lower.toDouble() + diff), _linePaint);
         lower += 8;
       }
@@ -1118,6 +704,36 @@ class SideWheel extends CustomPainter {
   @override
   bool shouldRepaint(CustomPainter oldDelegate) {
     SideWheel old = oldDelegate as SideWheel;
-    return !(old.currentRotationAngle == this.currentRotationAngle && old.startFromLeft == this.startFromLeft && old.yTouch == this.yTouch);
+    return !(old.currentRotationAngle == this.currentRotationAngle && old.startFromLeft == this.startFromLeft && old.center == this.center);
+  }
+}
+
+class FavouriteManga extends StatelessWidget {
+  final Function onClick;
+  final String name;
+  final String coverURL;
+
+  const FavouriteManga({Key key, this.name, this.coverURL, this.onClick}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Column(
+        children: [
+          CachedNetworkImage(
+            imageUrl: this.coverURL,
+            height: Widgeter.imgHeight,
+            width: Widgeter.imgWidth,
+            fit: BoxFit.contain,
+          ),
+          Text(
+            name,
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

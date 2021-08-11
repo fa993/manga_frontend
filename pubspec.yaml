@@ -38,6 +38,7 @@ dependencies:
   scrollable_positioned_list: ^0.1.10
   battery_plus: ^1.1.0
   intl: ^0.17.0
+  reorderables: ^0.4.1
 
 dev_dependencies:
   flutter_test:
