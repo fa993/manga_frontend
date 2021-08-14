@@ -18,7 +18,7 @@ import 'visual_objects.dart';
 void main() {
   HttpOverrides.global = new DevHttpsOverides();
   MangaPageChapterPanel.onClick = (c, t) {
-    if(t.chaps[t.currentIndex] != null) {
+    if (t.chaps[t.currentIndex] != null) {
       DBer.readChapter(t.mangaId, t.chaps[t.currentIndex].id);
       Navigator.pushNamed(c, "/read", arguments: t);
     }
@@ -50,7 +50,11 @@ class MyApp extends StatelessWidget {
       home: MyHomePage(),
       onGenerateRoute: (settings) {
         if (settings.name == '/search') {
-          return MaterialPageRoute(builder: (context) => SearchPageWidget());
+          return MaterialPageRoute(
+            builder: (context) => SearchPageWidget(
+              includeDBResults: settings.arguments as bool,
+            ),
+          );
         } else if (settings.name == '/manga') {
           return MaterialPageRoute(
             builder: (context) => MangaPageWidget(
@@ -191,7 +195,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             IconButton(
               icon: Icon(Icons.search),
               onPressed: () {
-                Navigator.pushNamed(context, '/search');
+                Navigator.pushNamed(context, '/search', arguments: false);
               },
             ),
           ],
@@ -275,7 +279,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
           IconButton(
             icon: Icon(Icons.search),
             onPressed: () {
-              Navigator.pushNamed(context, '/search');
+              Navigator.pushNamed(context, '/search', arguments: true);
             },
           ),
         ],
@@ -322,19 +326,25 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
 }
 
 class SearchPageWidget extends StatefulWidget {
-  const SearchPageWidget({Key key}) : super(key: key);
+  final bool includeDBResults;
+
+  const SearchPageWidget({Key key, this.includeDBResults}) : super(key: key);
 
   @override
   _SearchPageWidgetState createState() => _SearchPageWidgetState();
 }
 
 class _SearchPageWidgetState extends State<SearchPageWidget> {
-  Map<int, MangaHeading> _hd = <int, MangaHeading>{};
+  List<MangaHeading> _hdFromDB = [];
+  Map<int, MangaHeading> _hdFromAPI = <int, MangaHeading>{};
+
   ScrollController _sc = new ScrollController();
+
   bool _isLoading = false;
   MangaQuery _mangaQuery;
   int _t = DateTime.now().millisecondsSinceEpoch;
   int _rateLimitFetchMore = 100;
+
   bool _finished = false;
 
   @override
@@ -355,6 +365,16 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
     super.dispose();
   }
 
+  void fetchFromDatabase() {
+    DBer.fromQuery(_mangaQuery).then(
+      (value) => setState(
+        () {
+          _hdFromDB = value.toList();
+        },
+      ),
+    );
+  }
+
   bool fetchMore([int limit = 10]) {
     if (!_isLoading || DateTime.now().millisecondsSinceEpoch - _t > _rateLimitFetchMore) {
       _t = DateTime.now().millisecondsSinceEpoch;
@@ -367,8 +387,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   void fetch([int limit = 10]) {
     startedLoading();
+    //TODO database fetch also
     _mangaQuery.limit = limit;
-    _mangaQuery.offset = _hd.length;
+    _mangaQuery.offset = _hdFromAPI.length;
     APIer.fetchSearch(_mangaQuery).then((value) {
       if (_mangaQuery == value.query) {
         if (value.headings.isEmpty) {
@@ -376,7 +397,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
         }
         for (int i = 0; i < value.headings.length; i++) {
           processHeading(value.headings[i]);
-          _hd.update(value.query.offset + i, (old) => value.headings[i], ifAbsent: () => value.headings[i]);
+          _hdFromAPI.update(value.query.offset + i, (old) => value.headings[i], ifAbsent: () => value.headings[i]);
         }
       }
       stoppedLoading();
@@ -384,8 +405,10 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   }
 
   void fetchAgain() {
-    _hd.clear();
+    _hdFromAPI.clear();
+    _hdFromDB.clear();
     _finished = false;
+    fetchFromDatabase();
     fetch();
   }
 
@@ -403,18 +426,20 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   void processHeading(MangaHeading hd) {
     int x = hd.description.length;
-    if (x < 255) {
-    } else {
+    if (x >= 255) {
       hd.description = hd.description.substring(0, 253) + "...";
     }
   }
 
-  void onDismiss(MangaHeading hd, DismissDirection dir) {
+  bool onDismiss(MangaHeading hd, DismissDirection dir) {
     if (dir == DismissDirection.startToEnd) {
       DBer.saveMangaHeading(hd);
+      return true;
     } else if (dir == DismissDirection.endToStart) {
       DBer.removeManga(hd.id);
+      return false;
     }
+    throw new UnsupportedError("How did you even manage to do this?");
   }
 
   @override
@@ -461,21 +486,29 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (buildContext, index) {
-                      if (index == _hd.length) {
+                      if (index == _hdFromAPI.length + _hdFromDB.length) {
                         return CenteredFixedCircle();
                       } else {
+                        MangaHeading hd1;
+                        if (index < _hdFromDB.length) {
+                          hd1 = _hdFromDB[index];
+                        } else {
+                          index -= _hdFromDB.length;
+                          hd1 = _hdFromAPI[index];
+                        }
                         return InkWell(
                           child: MangaThumbnail(
-                            hd: _hd[index],
-                            onDismiss: (d) => onDismiss(_hd[index], d),
+                            hd: hd1,
+                            onDismiss: (d) => onDismiss(hd1, d),
+                            isSaved: DBer.isSaved(hd1.id),
                           ),
                           onTap: () {
-                            Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(_hd[index].id));
+                            Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(hd1.id));
                           },
                         );
                       }
                     },
-                    childCount: _finished ? _hd.length : _hd.length + 1,
+                    childCount: _finished ? (_hdFromAPI.length + _hdFromDB.length) : (_hdFromAPI.length + _hdFromDB.length + 1),
                   ),
                 ),
               ],
@@ -700,7 +733,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     if (chapIndex < 0) {
       return;
     }
-    if(chapIndex != _lastKnownChapterIndex){
+    if (chapIndex != _lastKnownChapterIndex) {
       DBer.readChapter(widget.current.mangaId, widget.current.chaps[chapIndex].id);
     }
     int plusOne = chapIndex + 1;

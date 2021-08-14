@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
+import 'package:manga_frontend/visual_objects.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart' as uuid;
@@ -15,7 +16,7 @@ class APIer {
 
   static http.Client _cli = new http.Client();
 
-  static Future<List<IndexedMangaHeading>> fetchFavourites() async {
+  static Future<List<SavedManga>> fetchFavourites() async {
     final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/favourites"));
     if (response.statusCode == HttpStatus.ok) {
       return await compute(doParseFavourites, response.body);
@@ -24,8 +25,8 @@ class APIer {
     }
   }
 
-  static List<IndexedMangaHeading> doParseFavourites(String response) {
-    return jsonDecode(response).cast<Map<String, dynamic>>().map<MangaHeading>((value) => IndexedMangaHeading.fromJSON(value)).toList();
+  static List<SavedManga> doParseFavourites(String response) {
+    return jsonDecode(response).cast<Map<String, dynamic>>().map<MangaHeading>((value) => SavedManga.fromJSON(value)).toList();
   }
 
   static Future<List<MangaHeading>> fetchHome(int offset, [int limit = 10]) async {
@@ -126,21 +127,21 @@ class DBer {
         join(await getDatabasesPath(), _databaseName),
         onCreate: (db, version) async {
           await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
-          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
         },
         onUpgrade: (db, vo, vn) async {
           await db.execute('DROP TABLE $_mangaTableName');
-          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE $_chapterTableName');
           await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
         },
         onDowngrade: (db, vo, vn) async {
           await db.execute('DROP TABLE $_mangaTableName');
-          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE $_chapterTableName');
           await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
         },
-        version: 5,
+        version: 1,
       );
       _initialized = true;
     }
@@ -158,6 +159,11 @@ class DBer {
       _notifierForChapter.dispose();
     }
     _notifierForChapter = notifier;
+  }
+
+  static Future<Iterable<MangaHeading>> fromQuery(MangaQuery query) {
+    //TODO write this
+    return null;
   }
 
   static Future<Iterable<SavedManga>> getAllSavedMangaAsync() async {
@@ -181,10 +187,10 @@ class DBer {
   }
 
   static void saveMangaHeading(MangaHeading mg) async {
-    return saveManga(mg.id, mg.name, mg.coverURL);
+    return saveManga(mg.id, mg.name, mg.coverURL, mg.description, mg.allGenres);
   }
 
-  static Future<void> saveManga(String id, String name, String coverURL) async {
+  static Future<void> saveManga(String id, String name, String coverURL, String description, String allGenres) async {
     await _mangaDB.transaction((txn) async {
       int index = Sqflite.firstIntValue(await txn.rawQuery('SELECT max(manga_index) from $_mangaTableName'));
       if (index != null) {
@@ -199,6 +205,8 @@ class DBer {
           name: name,
           coverURL: coverURL,
           index: index,
+          description: description,
+          allGenres: allGenres,
         ).toMap(),
         conflictAlgorithm: ConflictAlgorithm.rollback,
       );
@@ -283,24 +291,38 @@ class ReadChapter {
   }
 }
 
-class SavedManga {
-  String id;
-
+class SavedManga extends MangaHeading {
   int index;
-
-  String coverURL;
-
-  String name;
 
   SavedManga();
 
-  SavedManga.all({this.id, this.index, this.coverURL, this.name});
+  SavedManga.all({this.index, String id, String name, String coverURL, String description, String allGenres})
+      : super.all(
+          id: id,
+          name: name,
+          coverURL: coverURL,
+          description: description,
+          allGenres: allGenres,
+        );
+
+  factory SavedManga.fromJSON(Map<String, dynamic> json) {
+    return SavedManga.all(
+      index: json['manga_index'],
+      name: json['name'],
+      id: json['id'],
+      allGenres: json['genres'],
+      description: json['description'],
+      coverURL: json['coverURL'],
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'saved_manga_id': this.id,
       'name': this.name,
       'coverURL': this.coverURL,
+      'description': this.description,
+      'all_genres': this.allGenres,
       'manga_index': this.index,
     };
   }
@@ -309,7 +331,7 @@ class SavedManga {
   bool operator ==(Object other) => identical(this, other) || other is SavedManga && id == other.id;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => this.id.hashCode;
 }
 
 class MangaHeading {
@@ -342,32 +364,6 @@ class MangaHeading {
 
   @override
   bool operator ==(other) => other is MangaHeading && (other.id == this.id);
-}
-
-class IndexedMangaHeading {
-  MangaHeading heading;
-
-  int index;
-
-  IndexedMangaHeading({this.index, this.heading});
-
-  factory IndexedMangaHeading.fromJSON(Map<String, dynamic> json) {
-    return IndexedMangaHeading(
-      index: json.containsKey('index') ? json['index'] : -1,
-      heading: MangaHeading.fromJSON(json['heading']),
-    );
-  }
-
-  factory IndexedMangaHeading.fromAPI(Map<String, dynamic> json) {
-    return IndexedMangaHeading(
-      index: json.containsKey('index') ? json['index'] : -1,
-      heading: MangaHeading.fromJSON(json),
-    );
-  }
-
-  factory IndexedMangaHeading.fromHeading(int index, Map<String, dynamic> json) {
-    return IndexedMangaHeading.fromAPI(json)..index = index;
-  }
 }
 
 class MangaQuery {

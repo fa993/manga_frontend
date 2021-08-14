@@ -35,93 +35,132 @@ class Widgeter {
   );
 }
 
-class MangaThumbnail extends StatelessWidget {
-  final MangaHeading hd;
-  final Function(DismissDirection) onDismiss;
+class MangaThumbnail extends StatefulWidget {
+  static const Color gold = Color.fromARGB(255, 218, 165, 32);
 
-  const MangaThumbnail({Key key, this.hd, this.onDismiss}) : super(key: key);
+  final MangaHeading hd;
+  final bool Function(DismissDirection) onDismiss;
+  final Future<bool> isSaved;
+
+  const MangaThumbnail({Key key, this.hd, this.onDismiss, this.isSaved}) : super(key: key);
+
+  @override
+  _MangaThumbnailState createState() => _MangaThumbnailState();
+}
+
+class _MangaThumbnailState extends State<MangaThumbnail> {
+  bool _isSaved;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: ObjectKey(hd.id),
+      key: ObjectKey(widget.hd.id),
       confirmDismiss: (d) {
-        onDismiss.call(d);
+        if (_isSaved != null) {
+          bool x = widget.onDismiss.call(d);
+          setState(() {
+            _isSaved = x;
+          });
+        }
         return Future.value(false);
       },
-      child: Container(
-        margin: EdgeInsets.all(Widgeter.edgeSpace),
-        padding: EdgeInsets.all(Widgeter.edgeSpace),
-        foregroundDecoration: BoxDecoration(border: Border.all(color: Colors.green)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              fit: FlexFit.loose,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: hd.coverURL,
-                    height: Widgeter.imgHeight,
-                    width: Widgeter.imgWidth,
-                    alignment: Alignment.centerLeft,
-                    placeholder: (context, url) => Widgeter.img,
-                  ),
-                  SizedBox(
-                    width: Widgeter.gapSpace,
-                  ),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                            height: Widgeter.imgHeight - Widgeter.gapSpace,
-                            child: Text(
-                              hd.description,
+      child: FutureBuilder(
+        future: widget.isSaved,
+        builder: (context, snapshot) {
+          Color c = Colors.green;
+          if (_isSaved == null) {
+            if (snapshot.hasData) {
+              _isSaved = snapshot.data;
+              if (snapshot.data) {
+                c = MangaThumbnail.gold;
+              }
+            } else if (snapshot.hasError) {
+            } else {
+              c = Colors.white;
+            }
+          } else {
+            c = _isSaved ? MangaThumbnail.gold : Colors.green;
+          }
+          return Container(
+            margin: EdgeInsets.all(Widgeter.edgeSpace),
+            padding: EdgeInsets.all(Widgeter.edgeSpace),
+            foregroundDecoration: BoxDecoration(border: Border.all(color: c)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: widget.hd.coverURL,
+                        height: Widgeter.imgHeight,
+                        width: Widgeter.imgWidth,
+                        alignment: Alignment.centerLeft,
+                        placeholder: (context, url) => Widgeter.img,
+                      ),
+                      SizedBox(
+                        width: Widgeter.gapSpace,
+                      ),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                                height: Widgeter.imgHeight - Widgeter.gapSpace,
+                                child: Text(
+                                  widget.hd.description,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: Widgeter.descriptionFontSize,
+                                    fontFamily: Widgeter.fontFamily,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                  maxLines: 12,
+                                  overflow: TextOverflow.fade,
+                                )),
+                            Text(
+                              widget.hd.allGenres,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: Widgeter.descriptionFontSize,
+                                fontSize: Widgeter.genreFontSize,
                                 fontFamily: Widgeter.fontFamily,
                                 decoration: TextDecoration.none,
                               ),
-                              maxLines: 12,
-                              overflow: TextOverflow.fade,
-                            )),
-                        Text(
-                          hd.allGenres,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: Widgeter.genreFontSize,
-                            fontFamily: Widgeter.fontFamily,
-                            decoration: TextDecoration.none,
-                          ),
-                          softWrap: true,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        )
-                      ],
-                    ),
+                              softWrap: true,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            )
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                SizedBox(height: Widgeter.gapSpace),
+                Text(
+                  widget.hd.name,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: Widgeter.nameFontSize,
+                    fontFamily: Widgeter.fontFamily,
+                    decoration: TextDecoration.none,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            SizedBox(height: Widgeter.gapSpace),
-            Text(
-              hd.name,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: Widgeter.nameFontSize,
-                fontFamily: Widgeter.fontFamily,
-                decoration: TextDecoration.none,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -258,7 +297,7 @@ class MangaPageChapterPanel extends StatefulWidget {
   static Function(BuildContext, Chapters) onClick = (c, t) => {};
 
   static String chapterToDisplayString(ChapterData dat) {
-    if(dat != null) {
+    if (dat != null) {
       return dat.chapterNumber == null || dat.chapterNumber.isEmpty ? dat.chapterName : dat.chapterNumber;
     } else {
       return "";
@@ -486,7 +525,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
           break;
         }
         canvas.drawRRect(RRect.fromLTRBR(left, top, left + Widgeter.mangaPageChapterButtonWidth, top + Widgeter.mangaPageChapterButtonHeight, Radius.circular(radius)), painter);
-        TextPainter num = TextPainter(
+        TextPainter(
           text: TextSpan(text: MangaPageChapterPanel.chapterToDisplayString(chaps[startIndex]), style: style),
           maxLines: 1,
           ellipsis: "...",
@@ -542,6 +581,10 @@ class MangaPage extends StatefulWidget {
 
   const MangaPage({Key key, this.manga}) : super(key: key);
 
+  static String genresToString(List<Genre> input) {
+    return input.map((e) => e.name[0].toUpperCase() + e.name.substring(1).toLowerCase()).join(', ');
+  }
+
   @override
   _MangaPageState createState() => _MangaPageState();
 }
@@ -588,7 +631,7 @@ class _MangaPageState extends State<MangaPage> {
                     isFavourite: _isSaved == null ? DBer.isSaved(widget.manga.id) : Future.value(_isSaved),
                     onToggleFavourite: (b) {
                       if (!b) {
-                        DBer.saveManga(widget.manga.id, widget.manga.title, widget.manga.coverURL).then((value) => setState(() => _isSaved = true));
+                        DBer.saveManga(widget.manga.id, widget.manga.title, widget.manga.coverURL, widget.manga.description, MangaPage.genresToString(widget.manga.genres)).then((value) => setState(() => _isSaved = true));
                       } else {
                         DBer.removeManga(widget.manga.id).then((value) => setState(() => _isSaved = false));
                       }
