@@ -9,6 +9,8 @@ import 'package:transparent_image/transparent_image.dart';
 class Widgeter {
   static double imgHeight = 200;
   static double imgWidth = 128.6;
+  static double favouriteImgHeight = 140;
+  static double favouriteImgWidth = 90;
   static double gapSpace = 16.0;
   static double edgeSpace = 16.0;
   static double descriptionFontSize = 12.0;
@@ -160,13 +162,89 @@ class MangaPageGenres extends StatelessWidget {
 }
 
 class MangaPageButtonPanel extends StatelessWidget {
-  const MangaPageButtonPanel({Key key}) : super(key: key);
+  final Future<bool> isFavourite;
+  final Function(bool) onToggleFavourite;
+  final Future<ChapterSlice> readChapter;
+  final Function(int) onClickReadChapter;
+
+  const MangaPageButtonPanel({Key key, this.isFavourite, this.onToggleFavourite, this.readChapter, this.onClickReadChapter}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     //TODO finish this after favourites system is in place
-    return SizedBox(
-      height: 30,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FutureBuilder(
+          future: isFavourite,
+          builder: (context, snapshot) {
+            Function onP;
+            Widget chi;
+            if (snapshot.hasData) {
+              onP = () => onToggleFavourite.call(snapshot.data);
+              chi = Icon(snapshot.data ? Icons.favorite_rounded : Icons.favorite_border_rounded);
+            } else if (snapshot.hasError) {
+              onP = () {};
+              chi = Icon(Icons.error);
+            } else {
+              onP = () {};
+              chi = Icon(Icons.alarm_rounded);
+            }
+            return OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                side: BorderSide(
+                  color: Colors.green,
+                  width: 2.0,
+                ),
+              ),
+              onPressed: onP,
+              child: chi,
+            );
+          },
+        ),
+        SizedBox(
+          width: 30,
+        ),
+        FutureBuilder(
+          future: readChapter,
+          builder: (context, snapshot) {
+            Function onP;
+            String tex;
+            if (snapshot.hasData) {
+              onP = () => onClickReadChapter.call(snapshot.data.chapterIndex);
+              tex = snapshot.data.displayText;
+            } else if (snapshot.hasError) {
+              print(snapshot.error);
+              onP = () {};
+              tex = "Err";
+            } else {
+              onP = () {};
+              tex = "...";
+            }
+            return OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                side: BorderSide(
+                  color: Colors.green,
+                  width: 2.0,
+                ),
+              ),
+              onPressed: onP,
+              child: Text(
+                tex,
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -178,6 +256,14 @@ class MangaPageChapterPanel extends StatefulWidget {
   final int expandedIndex;
 
   static Function(BuildContext, Chapters) onClick = (c, t) => {};
+
+  static String chapterToDisplayString(ChapterData dat) {
+    if(dat != null) {
+      return dat.chapterNumber == null || dat.chapterNumber.isEmpty ? dat.chapterName : dat.chapterNumber;
+    } else {
+      return "";
+    }
+  }
 
   const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex}) : super(key: key);
 
@@ -257,7 +343,7 @@ class MangaPageChapterList extends StatelessWidget {
       child: ListView.separated(
         itemBuilder: (context, index) {
           return MangaPageChapterButton(
-            displayName: chaps[index].chapterNumber == null || chaps[index].chapterNumber.isEmpty ? chaps[index].chapterName : chaps[index].chapterNumber,
+            displayName: MangaPageChapterPanel.chapterToDisplayString(chaps[index]),
             onClick: onClick.call(index),
           );
         },
@@ -313,7 +399,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     } else {
       int index = ((colNum * numOfChapsPerRow) + rowNum);
       print("Chap Clicked: " + (index + 1).toString());
-      // this.widget.onClick.call(index).call(context);
+      this.widget.onClick.call(index).call(context);
     }
   }
 
@@ -401,7 +487,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
         }
         canvas.drawRRect(RRect.fromLTRBR(left, top, left + Widgeter.mangaPageChapterButtonWidth, top + Widgeter.mangaPageChapterButtonHeight, Radius.circular(radius)), painter);
         TextPainter num = TextPainter(
-          text: TextSpan(text: chaps[startIndex].chapterNumber == null || chaps[startIndex].chapterNumber.isEmpty ? chaps[startIndex].chapterName : chaps[startIndex].chapterNumber, style: style),
+          text: TextSpan(text: MangaPageChapterPanel.chapterToDisplayString(chaps[startIndex]), style: style),
           maxLines: 1,
           ellipsis: "...",
           textDirection: TextDirection.ltr,
@@ -461,6 +547,16 @@ class MangaPage extends StatefulWidget {
 }
 
 class _MangaPageState extends State<MangaPage> {
+  final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
+
+  bool _isSaved;
+
+  @override
+  void initState() {
+    super.initState();
+    DBer.registerNotifierForChapter(_notifier);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
@@ -484,7 +580,31 @@ class _MangaPageState extends State<MangaPage> {
             case 1:
               return MangaPageDescription(description: widget.manga.description);
             case 2:
-              return MangaPageButtonPanel();
+              //TODO encapsulate this outside.. ideally you don't want any api call in this library
+              return ValueListenableBuilder<int>(
+                valueListenable: _notifier,
+                builder: (context, junk, child) {
+                  return MangaPageButtonPanel(
+                    isFavourite: _isSaved == null ? DBer.isSaved(widget.manga.id) : Future.value(_isSaved),
+                    onToggleFavourite: (b) {
+                      if (!b) {
+                        DBer.saveManga(widget.manga.id, widget.manga.title, widget.manga.coverURL).then((value) => setState(() => _isSaved = true));
+                      } else {
+                        DBer.removeManga(widget.manga.id).then((value) => setState(() => _isSaved = false));
+                      }
+                    },
+                    readChapter: DBer.getMostRecentReadChapter(widget.manga.id).then((value) {
+                      MapEntry<int, ChapterData> ent = widget.manga.chapters.entries.firstWhere((element) => element.value.id == value, orElse: () => widget.manga.chapters.entries.first);
+                      return ChapterSlice.all(MangaPageChapterPanel.chapterToDisplayString(ent.value), ent.key);
+                    }, onError: (t) {
+                      return ChapterSlice.all(MangaPageChapterPanel.chapterToDisplayString(widget.manga.chapters[0]), 0);
+                    }),
+                    onClickReadChapter: (t) {
+                      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source));
+                    },
+                  );
+                },
+              );
             case 3:
               return MangaPageChapterPanel(
                 mangaId: widget.manga.id,
@@ -718,16 +838,22 @@ class FavouriteManga extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: Widgeter.favouriteImgWidth,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CachedNetworkImage(
             imageUrl: this.coverURL,
-            height: Widgeter.imgHeight,
-            width: Widgeter.imgWidth,
+            height: Widgeter.favouriteImgHeight,
+            width: Widgeter.favouriteImgWidth,
             fit: BoxFit.contain,
           ),
           Text(
             name,
+            softWrap: true,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white,
             ),
@@ -736,4 +862,11 @@ class FavouriteManga extends StatelessWidget {
       ),
     );
   }
+}
+
+class ChapterSlice {
+  String displayText;
+  int chapterIndex;
+
+  ChapterSlice.all(this.displayText, this.chapterIndex);
 }

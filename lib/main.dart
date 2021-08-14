@@ -17,13 +17,18 @@ import 'visual_objects.dart';
 
 void main() {
   HttpOverrides.global = new DevHttpsOverides();
-  DBer.initializeDatabase();
-  MangaPageChapterPanel.onClick = (c, t) => Navigator.pushNamed(c, "/read", arguments: t);
+  MangaPageChapterPanel.onClick = (c, t) {
+    if(t.chaps[t.currentIndex] != null) {
+      DBer.readChapter(t.mangaId, t.chaps[t.currentIndex].id);
+      Navigator.pushNamed(c, "/read", arguments: t);
+    }
+  };
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -42,20 +47,22 @@ class MyApp extends StatelessWidget {
           unselectedWidgetColor: Colors.white,
           fontFamily: DefaultTextStyle.of(context).style.fontFamily,
           backgroundColor: Colors.black),
-      home: MyHomePage(title: 'Home'),
+      home: MyHomePage(),
       onGenerateRoute: (settings) {
         if (settings.name == '/search') {
           return MaterialPageRoute(builder: (context) => SearchPageWidget());
         } else if (settings.name == '/manga') {
           return MaterialPageRoute(
-              builder: (context) => MangaPageWidget(
-                    current: settings.arguments as Future<CompleteManga>,
-                  ));
+            builder: (context) => MangaPageWidget(
+              current: settings.arguments as Future<CompleteManga>,
+            ),
+          );
         } else if (settings.name == '/read') {
           return MaterialPageRoute(
-              builder: (context) => ReaderWidget(
-                    current: settings.arguments as Chapters,
-                  ));
+            builder: (context) => ReaderWidget(
+              current: settings.arguments as Chapters,
+            ),
+          );
         }
         return null;
       },
@@ -71,15 +78,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -89,42 +87,23 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _selectionIndex = 0;
 
-  List<Function> _navs = [
-    () => new HomePageWidget(),
-    () => new FavouritesPageWidget(),
-    () => new ProfilePageWidget(),
+  List<Widget> _actualNavs = <Widget>[
+    new HomePageWidget(),
+    new FavouritesPageWidget(),
+    new ProfilePageWidget(),
   ];
-
-  List<Widget> _actualNavs = <Widget>[];
 
   @override
   void initState() {
     super.initState();
-    for (int i = 0; i < _navs.length; i++) {
-      _actualNavs.add(SizedBox());
-    }
-    _actualNavs[_selectionIndex] = _navs.elementAt(_selectionIndex).call();
-  }
-
-  void _onTap(int newIndex) {
-    setState(() {
-      _selectionIndex = newIndex;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
-      body: IndexedStack(index: _selectionIndex, children: _actualNavs),
+      body: _actualNavs[_selectionIndex],
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.black,
         items: <BottomNavigationBarItem>[
@@ -134,13 +113,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
-        onTap: (t) => {
+        onTap: (t) {
           setState(() {
-            if (_actualNavs.elementAt(t) is SizedBox) {
-              _actualNavs[t] = _navs.elementAt(t).call();
-            }
             _selectionIndex = t;
-          }),
+          });
         },
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
@@ -213,10 +189,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           pinned: true,
           actions: [
             IconButton(
-                icon: Icon(Icons.search),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/search');
-                })
+              icon: Icon(Icons.search),
+              onPressed: () {
+                Navigator.pushNamed(context, '/search');
+              },
+            ),
           ],
         ),
         // SliverList(
@@ -255,29 +232,38 @@ class FavouritesPageWidget extends StatefulWidget {
 }
 
 class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
-  List<Widget> _renderedManga = [];
-  List<SavedManga> _savedManga = [];
+  final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
-    reload();
+    DBer.registerNotifierForFavourites(_notifier);
+    DBer.initializeDatabase().then((value) {
+      _notifier.value += 1;
+    });
   }
 
-  void reload() {
-    DBer.getAllSavedManga().then(
-      (value) {
-        _savedManga = value.toList();
-        value.map(
-          (e) => _renderedManga.add(
-            FavouriteManga(
+  void _move<T>(int from, int to, List<T> items) {
+    T item = items.removeAt(from);
+    items.insert(to, item);
+  }
+
+  List<Widget> parse(Iterable<SavedManga> all, List<Widget> renderedManga, List<SavedManga> savedManga) {
+    if (all != null) {
+      savedManga.addAll(all);
+      savedManga.forEach(
+        (e) => renderedManga.add(
+          InkWell(
+            child: FavouriteManga(
               name: e.name,
               coverURL: e.coverURL,
             ),
+            onTap: () => Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(e.id)),
           ),
-        );
-      },
-    );
+        ),
+      );
+    }
+    return renderedManga;
   }
 
   @override
@@ -287,25 +273,47 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         title: Text("Favourites"),
         actions: [
           IconButton(
-              icon: Icon(Icons.search),
-              onPressed: () {
-                Navigator.pushNamed(context, '/search');
-              })
+            icon: Icon(Icons.search),
+            onPressed: () {
+              Navigator.pushNamed(context, '/search');
+            },
+          ),
         ],
       ),
+      backgroundColor: Colors.black,
       body: SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.all(16.0),
-          child: ReorderableWrap(
-            children: _renderedManga,
-            onReorder: (from, to) {
-              String id1 = _savedManga[from].id;
-              String id2 = _savedManga[to].id;
-              SavedManga mg1 = _savedManga[from];
-              _savedManga[from] = _savedManga[to];
-              _savedManga[to] = mg1;
-              DBer.reorder(id1, id2);
-            },
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.all(16.0),
+            child: ValueListenableBuilder<int>(
+              valueListenable: _notifier,
+              builder: (context, junk, child) {
+                return FutureBuilder(
+                  future: DBer.getAllSavedMangaAsync(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      List<Widget> renderedManga = [];
+                      List<SavedManga> savedManga = [];
+                      parse(snapshot.data, renderedManga, savedManga);
+                      return ReorderableWrap(
+                        needsLongPressDraggable: false,
+                        spacing: 16.0,
+                        children: renderedManga,
+                        onReorder: (from, to) {
+                          String id1 = savedManga[from].id;
+                          String id2 = savedManga[to].id;
+                          _move(from, to, savedManga);
+                          _move(from, to, renderedManga);
+                          DBer.reorder(id1, id2);
+                        },
+                      );
+                    } else {
+                      return CenteredFixedCircle();
+                    }
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -403,9 +411,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   void onDismiss(MangaHeading hd, DismissDirection dir) {
     if (dir == DismissDirection.startToEnd) {
-      DBer.add(hd);
+      DBer.saveMangaHeading(hd);
     } else if (dir == DismissDirection.endToStart) {
-      DBer.remove(hd.id);
+      DBer.removeManga(hd.id);
     }
   }
 
@@ -548,7 +556,7 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
                     color: Colors.black,
                     child: CachedNetworkImage(
                       imageUrl: _mn.coverURL,
-                      fit: BoxFit.fitWidth,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),
@@ -594,10 +602,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
   double _currentWheelRotation = 0;
 
-  // PageController _pageController;
-  // ItemScrollController _scrollController;
-  // ItemPositionsListener _scrollListener;
-
+  //TODO some issue with dispose
   ScrollSynchronizer _synchronizer;
 
   int _formalIndexAtStartOfCurrentChapter = 0;
@@ -625,9 +630,12 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
   bool disposed = false;
 
+  int _lastKnownChapterIndex;
+
   @override
   void initState() {
     super.initState();
+    _lastKnownChapterIndex = widget.current.currentIndex;
     _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
     listenForInfo(_battery, Duration(seconds: 1));
@@ -661,6 +669,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     });
   }
 
+  //TODO some issue with mounted
   void listenForInfo(Battery b, Duration d) async {
     do {
       await Future.delayed(d);
@@ -690,6 +699,9 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     int chapIndex = chapStart > -1 ? _chapStartsToChapIndex[chapStart] : -1;
     if (chapIndex < 0) {
       return;
+    }
+    if(chapIndex != _lastKnownChapterIndex){
+      DBer.readChapter(widget.current.mangaId, widget.current.chaps[chapIndex].id);
     }
     int plusOne = chapIndex + 1;
     int minusOne = chapIndex - 1;

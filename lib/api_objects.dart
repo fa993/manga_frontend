@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -110,64 +111,175 @@ class APIer {
 class DBer {
   static const _databaseName = "manga.db";
   static const _mangaTableName = "saved_manga";
+  static const _chapterTableName = "read_chapter";
+
+  static bool _initialized = false;
+
+  static ValueNotifier<int> _notifierForFavourites;
+  static ValueNotifier<int> _notifierForChapter;
 
   static Database _mangaDB;
 
-  static void initializeDatabase() async {
-    _mangaDB = await openDatabase(
-      join(await getDatabasesPath(), _databaseName),
-      onCreate: (db, version) {
-        return db.execute(
-          'CREATE TABLE $_mangaTableName (saved_manga_id TEXT PRIMARY KEY, index INTEGER AUTOINCREMENT, name STRING, coverURL TEXT)',
-        );
-      },
-      version: 1,
-    );
+  static Future<void> initializeDatabase() async {
+    if (!_initialized) {
+      _mangaDB = await openDatabase(
+        join(await getDatabasesPath(), _databaseName),
+        onCreate: (db, version) async {
+          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+        },
+        onUpgrade: (db, vo, vn) async {
+          await db.execute('DROP TABLE $_mangaTableName');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute('DROP TABLE $_chapterTableName');
+          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
+        },
+        onDowngrade: (db, vo, vn) async {
+          await db.execute('DROP TABLE $_mangaTableName');
+          await db.execute('CREATE TABLE $_mangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute('DROP TABLE $_chapterTableName');
+          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, PRIMARY KEY(chapter_id))');
+        },
+        version: 5,
+      );
+      _initialized = true;
+    }
   }
 
-  static Future<Iterable<SavedManga>> getAllSavedManga() {
-    return _mangaDB.query(_mangaTableName, orderBy: 'index ASC').then(
-          (value) => value.map(
-            (e) => SavedManga.all(index: e['index'], id: e['saved_manga_id'], coverURL: e['coverURL'], name: e['name']),
-          ),
-        );
+  static void registerNotifierForFavourites(ValueNotifier<int> notifier) {
+    if (_notifierForFavourites != null) {
+      _notifierForFavourites.dispose();
+    }
+    _notifierForFavourites = notifier;
   }
 
-  static void add(MangaHeading mg) {
-    _mangaDB.insert(
-      _mangaTableName,
-      SavedManga.all(
-        id: mg.id,
-        name: mg.name,
-        coverURL: mg.coverURL,
-      ).toMap(),
-      conflictAlgorithm: ConflictAlgorithm.rollback,
-    );
+  static void registerNotifierForChapter(ValueNotifier<int> notifier) {
+    if (_notifierForChapter != null) {
+      _notifierForChapter.dispose();
+    }
+    _notifierForChapter = notifier;
   }
 
-  static void remove(String id) {
-    _mangaDB.delete(
+  static Future<Iterable<SavedManga>> getAllSavedMangaAsync() async {
+    if (_mangaDB != null) {
+      return _mangaDB
+          .query(
+        _mangaTableName,
+        columns: ['saved_manga_id', 'manga_index', 'coverURL', 'name'],
+        orderBy: 'manga_index ASC',
+      )
+          .then(
+        (value) {
+          return value.map(
+            (e) => SavedManga.all(index: e['manga_index'], id: e['saved_manga_id'], coverURL: e['coverURL'], name: e['name']),
+          );
+        },
+      );
+    } else {
+      return null;
+    }
+  }
+
+  static void saveMangaHeading(MangaHeading mg) async {
+    return saveManga(mg.id, mg.name, mg.coverURL);
+  }
+
+  static Future<void> saveManga(String id, String name, String coverURL) async {
+    await _mangaDB.transaction((txn) async {
+      int index = Sqflite.firstIntValue(await txn.rawQuery('SELECT max(manga_index) from $_mangaTableName'));
+      if (index != null) {
+        index += 1;
+      } else {
+        index = 0;
+      }
+      await txn.insert(
+        _mangaTableName,
+        SavedManga.all(
+          id: id,
+          name: name,
+          coverURL: coverURL,
+          index: index,
+        ).toMap(),
+        conflictAlgorithm: ConflictAlgorithm.rollback,
+      );
+    });
+    _notifierForFavourites.value += 1;
+    return null;
+  }
+
+  static Future<void> removeManga(String id) async {
+    await _mangaDB.delete(
       _mangaTableName,
       where: 'saved_manga_id = ?',
       whereArgs: [id],
     );
+    _notifierForFavourites.value += 1;
+    return null;
+  }
+
+  static Future<bool> isSaved(String id) async {
+    return Sqflite.firstIntValue(await _mangaDB.rawQuery(
+          'SELECT EXISTS(SELECT 1 from $_mangaTableName WHERE saved_manga_id = ?)',
+          [id],
+        )) ==
+        1;
   }
 
   static void reorder(String id1, String id2) {
     //TODO
     _mangaDB.transaction((txn) async {
       //TODO test this
-      int index1 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id1], columns: ['index']));
-      int index2 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id2], columns: ['index']));
+      int index1 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id1], columns: ['manga_index']));
+      int index2 = Sqflite.firstIntValue(await txn.query(_mangaTableName, where: "saved_manga_id = ? ", whereArgs: [id2], columns: ['manga_index']));
       if (index2 < index1) {
-        txn.rawUpdate('UPDATE $_mangaTableName set index = index + 1 where index >= ? AND index < ?', [index2, index1]);
-        txn.rawUpdate('UPDATE $_mangaTableName set index = ? where saved_manga_id = ?', [index2, id1]);
+        await txn.rawUpdate('UPDATE $_mangaTableName set manga_index = manga_index + 1 where manga_index >= ? AND manga_index < ?', [index2, index1]);
       } else {
         //index2 > index1
-        txn.rawUpdate('UPDATE $_mangaTableName set index = index - 1 where index >= ? AND index < ?', [index1, index2]);
-        txn.rawUpdate('UPDATE $_mangaTableName set index = ? where saved_manga_id = ?', [index2, id1]);
+        await txn.rawUpdate('UPDATE $_mangaTableName set manga_index = manga_index - 1 where manga_index > ? AND manga_index <= ?', [index1, index2]);
       }
+      await txn.rawUpdate('UPDATE $_mangaTableName set manga_index = ? where saved_manga_id = ?', [index2, id1]);
     });
+  }
+
+  static void readChapter(String mangaId, String chapterId) async {
+    await _mangaDB.insert(
+      _chapterTableName,
+      ReadChapter.all(
+        mangaId: mangaId,
+        chapterId: chapterId,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      ).toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    _notifierForChapter.value += 1;
+  }
+
+  static Future<String> getMostRecentReadChapter(String mangaId) async {
+    List<Map<String, Object>> rows = await _mangaDB.query(
+      _chapterTableName,
+      columns: ['chapter_id'],
+      orderBy: 'chapter_read_time DESC',
+      where: 'manga_id = ?',
+      whereArgs: [mangaId],
+      limit: 1,
+    );
+    return rows.single.values.first;
+  }
+}
+
+class ReadChapter {
+  String chapterId;
+  int timestamp;
+  String mangaId;
+
+  ReadChapter.all({this.chapterId, this.timestamp, this.mangaId});
+
+  Map<String, dynamic> toMap() {
+    return {
+      'manga_id': mangaId,
+      'chapter_id': chapterId,
+      'chapter_read_time': timestamp,
+    };
   }
 }
 
@@ -189,6 +301,7 @@ class SavedManga {
       'saved_manga_id': this.id,
       'name': this.name,
       'coverURL': this.coverURL,
+      'manga_index': this.index,
     };
   }
 
