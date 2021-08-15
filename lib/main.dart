@@ -395,9 +395,13 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
         if (value.headings.isEmpty) {
           _finished = true;
         }
-        for (int i = 0; i < value.headings.length; i++) {
+        for (int i = 0, j = 0; i < value.headings.length; i++) {
+          if (_hdFromDB.contains(value.headings[i])) {
+            continue;
+          }
           processHeading(value.headings[i]);
-          _hdFromAPI.update(value.query.offset + i, (old) => value.headings[i], ifAbsent: () => value.headings[i]);
+          _hdFromAPI.update(value.query.offset + j, (old) => value.headings[i], ifAbsent: () => value.headings[i]);
+          j++;
         }
       }
       stoppedLoading();
@@ -406,9 +410,11 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   void fetchAgain() {
     _hdFromAPI.clear();
-    _hdFromDB.clear();
     _finished = false;
-    fetchFromDatabase();
+    if(this.widget.includeDBResults) {
+      _hdFromDB.clear();
+      fetchFromDatabase();
+    }
     fetch();
   }
 

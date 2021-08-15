@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:http/http.dart' as http;
-import 'package:manga_frontend/visual_objects.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart' as uuid;
@@ -162,8 +161,24 @@ class DBer {
   }
 
   static Future<Iterable<MangaHeading>> fromQuery(MangaQuery query) {
-    //TODO write this
-    return null;
+    return _mangaDB
+        .query(
+          _mangaTableName,
+          columns: ['saved_manga_id', 'name', 'coverURL', 'all_genres', 'description'],
+          where: 'name LIKE ?',
+          whereArgs: ['%${query.name}%'],
+        )
+        .then(
+          (value) => value.map(
+            (e) => MangaHeading.all(
+              id: e['saved_manga_id'],
+              name: e['name'],
+              allGenres: e['all_genres'],
+              description: e['description'],
+              coverURL: e['coverURL'],
+            ),
+          ),
+        );
   }
 
   static Future<Iterable<SavedManga>> getAllSavedMangaAsync() async {
@@ -328,7 +343,7 @@ class SavedManga extends MangaHeading {
   }
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is SavedManga && id == other.id;
+  bool operator ==(Object other) => other is SavedManga && id == other.id;
 
   @override
   int get hashCode => this.id.hashCode;
