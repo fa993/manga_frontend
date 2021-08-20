@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1065129513011",
+    "project_id": "mangaverse-1dc11",
+    "storage_bucket": "mangaverse-1dc11.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1065129513011:android:1bc30c34977c82fe85d346",
+        "android_client_info": {
+          "package_name": "com.ameya.manga_frontend"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1065129513011-igcp158bhg8igpb62nhc34pctu6ua3n3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFO0Xmtph2Jzc8A4c6hgIYlAjTrzoSNWo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1065129513011-igcp158bhg8igpb62nhc34pctu6ua3n3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

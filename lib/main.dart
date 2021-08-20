@@ -117,6 +117,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
+
         onTap: (t) {
           setState(() {
             _selectionIndex = t;
@@ -135,52 +136,7 @@ class HomePageWidget extends StatefulWidget {
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
-  // List<MangaHeading> _hd = <MangaHeading>[];
-  // ScrollController _sc = new ScrollController();
-  // bool _isLoading = false;
-  //
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _sc.addListener(() {
-  //     if (_sc.offset >= _sc.position.maxScrollExtent && !_sc.position.outOfRange) {
-  //       fetchMore();
-  //     }
-  //   });
-  //   fetchMore();
-  // }
-  //
-  // @override
-  // void dispose() {
-  //   _sc.dispose();
-  //   super.dispose();
-  // }
-  //
-  // bool fetchMore([int limit = 10]) {
-  //   if (!_isLoading) {
-  //     startedLoading();
-  //     APIer.fetchHome(_hd.length, limit).then((value) {
-  //       _hd.addAll(value);
-  //       stoppedLoading();
-  //     });
-  //     return true;
-  //   } else {
-  //     return false;
-  //   }
-  // }
-  //
-  // void stoppedLoading() {
-  //   setState(() {
-  //     _isLoading = false;
-  //   });
-  // }
-  //
-  // void startedLoading() {
-  //   setState(() {
-  //     _isLoading = true;
-  //   });
-  // }
-  //
+
   Widget getMain(BuildContext context) {
     return CustomScrollView(
       // controller: _sc,
@@ -200,30 +156,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ],
         ),
-        // SliverList(
-        //   delegate: SliverChildBuilderDelegate(
-        //     (buildContext, index) {
-        //       if (index == _hd.length) {
-        //         return CenteredFixedCircle();
-        //       } else {
-        //         return Widgeter.getHomePanel(_hd.elementAt(index));
-        //       }
-        //     },
-        //     childCount: _isLoading ? _hd.length + 1 : _hd.length,
-        //   ),
-        // ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
-    //   if (_sc.position.maxScrollExtent == 0) {
-    //     print('Through callback');
-    //     fetchMore();
-    //   }
-    // });
     return getMain(context);
   }
 }
@@ -686,16 +624,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
       _formalIndexAtStartOfCurrentChapter = (value);
       _formalIndexForList = _formalIndexAtStartOfCurrentChapter;
       PageController pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
-      // _pageController.addListener(() {
-      //   int index = _pageController.page.toInt();
-      //   _listen(index);
-      // });
       ItemScrollController scrollController = ItemScrollController();
       ItemPositionsListener scrollListener = ItemPositionsListener.create();
-      // _scrollListener.itemPositions.addListener(() {
-      //   int index = _scrollListener.itemPositions.value.first.index;
-      //   _listen(index);
-      // });
       _synchronizer = new ScrollSynchronizer();
       _synchronizer.attachPageControllerToAll([_LEFT_TO_RIGHT, _RIGHT_TO_LEFT], pageController);
       _synchronizer.attachListController(_UP_TO_DOWN, scrollController, scrollListener);
@@ -1139,18 +1069,24 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
 class ScrollSynchronizer {
   Map<int, IndexedScrollController> _storage = LinkedHashMap();
+  List<IndexedScrollController> _controllers = [];
 
   void attachPageController(int marker, PageController controller) {
-    _storage[marker] = PageScrollController(controller);
+    PageScrollController con = PageScrollController(controller);
+    _storage[marker] = con;
+    _controllers.add(con);
   }
 
   void attachPageControllerToAll(List<int> markers, PageController controller) {
     PageScrollController con = PageScrollController(controller);
     markers.forEach((element) => _storage[element] = con);
+    _controllers.add(con);
   }
 
   void attachListController(int marker, ItemScrollController controller, ItemPositionsListener listener) {
-    _storage[marker] = ListScrollController(controller, listener);
+    ListScrollController con = ListScrollController(controller, listener);
+    _storage[marker] = con;
+    _controllers.add(con);
   }
 
   IndexedScrollController get(int marker) {
@@ -1158,11 +1094,11 @@ class ScrollSynchronizer {
   }
 
   void listen(Function(IndexedScrollController) listener) {
-    this._storage.values.forEach((value) => value.listen(() => listener.call(value)));
+    this._controllers.forEach((value) => value.listen(() => listener.call(value)));
   }
 
   void dispose() {
-    this._storage.values.forEach((value) => value.dispose());
+    this._controllers.forEach((value) => value.dispose());
   }
 }
 
