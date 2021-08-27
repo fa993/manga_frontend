@@ -5,6 +5,8 @@ import 'dart:math';
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -15,74 +17,277 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'api_objects.dart';
 import 'visual_objects.dart';
 
-void main() {
+void main() async {
   HttpOverrides.global = new DevHttpsOverides();
-  MangaPageChapterPanel.onClick = (c, t) {
+  MangaPageChapterPanel.onClick = (c, t, f) {
     if (t.chaps[t.currentIndex] != null) {
-      DBer.readChapter(t.mangaId, t.chaps[t.currentIndex].id);
-      Navigator.pushNamed(c, "/read", arguments: t);
+      // Navigator.pushNamed(c, "/read", arguments: ReadArguments.all(t, DBer.getLastReadPage(t.chaps[t.currentIndex].id)));
+      f.call('/read', argument: ReadArguments.all(t, DBer.getLastReadPage(t.chaps[t.currentIndex].id)));
     }
   };
+  WidgetsFlutterBinding.ensureInitialized();
+  DBer.initializeDatabase();
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class MyApp extends StatefulWidget {
+  const MyApp({Key key}) : super(key: key);
 
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  Future<FirebaseApp> _init = Firebase.initializeApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _init,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          print(snapshot.error);
+          return CenteredFixedCircle();
+        } else if (snapshot.connectionState == ConnectionState.done) {
+          //TODO check if this works
+          FirebaseMessaging.instance.requestPermission();
+          return AppHome();
+        } else {
+          return CenteredFixedCircle();
+        }
+      },
+    );
+  }
+}
+
+class MyRoute<T> extends Page<T> {
+  final WidgetBuilder builder;
+
+  const MyRoute({this.builder, String name, Key key}) : super(key: key, name: name);
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return MaterialPageRoute(
+      builder: this.builder,
+      settings: this,
+    );
+  }
+}
+
+class AppHome extends StatefulWidget {
+  const AppHome({Key key}) : super(key: key);
+
+  @override
+  _AppHomeState createState() => _AppHomeState();
+}
+
+class _AppHomeState extends State<AppHome> {
+  final List<Page> pages = [];
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    pages.add(MyRoute(
+      builder: (context) => MyHomePage(
+        pushCallback: pushCallback,
+      ),
+      key: const Key("HomePage"),
+    ));
+  }
+
+  bool _onPopPage(Route<dynamic> route, dynamic result) {
+    pages.remove(route.settings);
+    return route.didPop(result);
+  }
+
+  void pushCallback(String routeName, {dynamic argument}) {
+    final Uri path = Uri.parse(routeName);
+    for (String segment in path.pathSegments) {
+      if (segment == 'search') {
+        pages.add(MyRoute(
+          builder: (context) => SearchPageWidget(
+            includeDBResults: argument as bool,
+            pushCallback: pushCallback,
+          ),
+          key: const Key("SearchPage"),
+        ));
+      } else if (segment == 'manga') {
+        pages.add(MyRoute(
+          builder: (context) => MangaPageWidget(
+            current: argument as Future<CompleteManga>,
+            pushCallback: pushCallback,
+          ),
+          key: const Key("MangaPage"),
+        ));
+      } else if (segment == 'read') {
+        ReadArguments arg = argument as ReadArguments;
+        pages.add(MyRoute(
+          builder: (context) => ReaderWidget(
+            current: arg.t,
+            lastSave: arg.page,
+            pushCallback: pushCallback,
+          ),
+          key: const Key("ReadPage"),
+        ));
+      } else {
+        pages.add(MyRoute(
+          builder: (context) => LostPage(),
+          key: const Key("LostPage"),
+        ));
+        break;
+      }
+    }
+    setState(() {});
+  }
+
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-          // This is the theme of your application.
-          //
-          // Try running your application with "flutter run". You'll see the
-          // application has a blue toolbar. Then, without quitting the app, try
-          // changing the primarySwatch below to Colors.green and then invoke
-          // "hot reload" (press "r" in the console where you ran "flutter run",
-          // or simply save your changes to "hot reload" in a Flutter IDE).
-          // Notice that the counter didn't reset back to zero; the application
-          // is not restarted.
-          primarySwatch: Colors.yellow,
-          unselectedWidgetColor: Colors.white,
-          fontFamily: DefaultTextStyle.of(context).style.fontFamily,
-          backgroundColor: Colors.black),
-      home: MyHomePage(),
-      onGenerateRoute: (settings) {
-        if (settings.name == '/search') {
-          return MaterialPageRoute(
-            builder: (context) => SearchPageWidget(
-              includeDBResults: settings.arguments as bool,
-            ),
-          );
-        } else if (settings.name == '/manga') {
-          return MaterialPageRoute(
-            builder: (context) => MangaPageWidget(
-              current: settings.arguments as Future<CompleteManga>,
-            ),
-          );
-        } else if (settings.name == '/read') {
-          return MaterialPageRoute(
-            builder: (context) => ReaderWidget(
-              current: settings.arguments as Chapters,
-            ),
-          );
-        }
-        return null;
-      },
-      // routes: <String, WidgetBuilder>{
-      //   '/search': (context) => SearchPageWidget(),
-      //   '/manga': (context) => MangaPageWidget(),
-      //   '/read': (context) => ReaderWidget(),
+        // This is the theme of your application.
+        //
+        // Try running your application with "flutter run". You'll see the
+        // application has a blue toolbar. Then, without quitting the app, try
+        // changing the primarySwatch below to Colors.green and then invoke
+        // "hot reload" (press "r" in the console where you ran "flutter run",
+        // or simply save your changes to "hot reload" in a Flutter IDE).
+        // Notice that the counter didn't reset back to zero; the application
+        // is not restarted.
+        primarySwatch: Colors.yellow,
+        unselectedWidgetColor: Colors.white,
+        fontFamily: DefaultTextStyle.of(context).style.fontFamily,
+        backgroundColor: Colors.black,
+      ),
+      home: WillPopScope(
+        onWillPop: () async => !await _navigatorKey.currentState.maybePop(),
+        child: Navigator(
+          key: _navigatorKey,
+          pages: List.unmodifiable(pages),
+          onPopPage: _onPopPage,
+        ),
+      ),
+      // home: MyHomePage(),
+      // onGenerateRoute: (settings) {
+      //   if (settings.name == '/search') {
+      //     return MaterialPageRoute(
+      //       builder: (context) => SearchPageWidget(
+      //         includeDBResults: settings.arguments as bool,
+      //       ),
+      //     );
+      //   } else if (settings.name == '/manga') {
+      //     return MaterialPageRoute(
+      //       builder: (context) => MangaPageWidget(
+      //         current: settings.arguments as Future<CompleteManga>,
+      //       ),
+      //     );
+      //   } else if (settings.name == '/read') {
+      //     ReadArguments arg = settings.arguments as ReadArguments;
+      //     return MaterialPageRoute(
+      //       builder: (context) => ReaderWidget(
+      //         current: arg.t,
+      //         lastSave: arg.page,
+      //       ),
+      //     );
+      //   }
+      //   return null;
       // },
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+class LostPage extends StatelessWidget {
+  const LostPage({Key key}) : super(key: key);
 
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        color: Colors.black,
+        child: Text(
+          "404",
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// enum RouteType { HOME_ROUTE, SEARCH_ROUTE, MANGA_PAGE_ROUTE, READER_ROUTE, LOST_ROUTE }
+//
+// class MangaRoutePath {
+//   RouteType routeType;
+//   String id;
+//   ReadArguments rd;
+//   Future<CompleteManga> current;
+//
+//   MangaRoutePath({this.routeType, this.id, this.rd, this.current});
+//
+//   factory MangaRoutePath.home() {
+//     return new MangaRoutePath(
+//       routeType: RouteType.HOME_ROUTE,
+//     );
+//   }
+//
+//   factory MangaRoutePath.search() {
+//     return new MangaRoutePath(
+//       routeType: RouteType.SEARCH_ROUTE,
+//     );
+//   }
+//
+//   factory MangaRoutePath.manga(Future<CompleteManga> current) {
+//     return new MangaRoutePath(
+//       routeType: RouteType.MANGA_PAGE_ROUTE,
+//       current: current,
+//     );
+//   }
+//
+//   factory MangaRoutePath.reader(ReadArguments rd) {
+//     return new MangaRoutePath(
+//       routeType: RouteType.READER_ROUTE,
+//       rd: rd,
+//     );
+//   }
+//
+//   factory MangaRoutePath.lost() {
+//     return new MangaRoutePath(
+//       routeType: RouteType.LOST_ROUTE,
+//     );
+//   }
+// }
+//
+//
+// class MangaRouteInformationParser extends RouteInformationParser<MangaRoutePath> {
+//   @override
+//   Future<MangaRoutePath> parseRouteInformation(RouteInformation routeInformation) async {
+//     final uri = Uri.parse(routeInformation.location);
+//     switch (uri.pathSegments.length) {
+//       case 0:
+//         return MangaRoutePath.home();
+//       case 1:
+//         return uri.pathSegments[0] == "search" ? MangaRoutePath.search() : MangaRoutePath.manga(null);
+//       case 2:
+//         return MangaRoutePath.reader(null);
+//       default:
+//         return MangaRoutePath.lost();
+//     }
+//   }
+//
+//   @override
+//   RouteInformation restoreRouteInformation(MangaRoutePath configuration) {
+//     return null;
+//   }
+// }
+
+class MyHomePage extends StatefulWidget {
   final String title;
+  final Function pushCallback;
+
+  const MyHomePage({Key key, this.title, this.pushCallback}) : super(key: key);
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -91,15 +296,20 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _selectionIndex = 0;
 
-  List<Widget> _actualNavs = <Widget>[
-    new HomePageWidget(),
-    new FavouritesPageWidget(),
-    new ProfilePageWidget(),
-  ];
+  List<Widget> _actualNavs;
 
   @override
   void initState() {
     super.initState();
+    _actualNavs = <Widget>[
+      new HomePageWidget(
+        pushCallback: this.widget.pushCallback,
+      ),
+      new FavouritesPageWidget(
+        pushCallback: this.widget.pushCallback,
+      ),
+      new ProfilePageWidget(),
+    ];
   }
 
   @override
@@ -117,7 +327,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
-
         onTap: (t) {
           setState(() {
             _selectionIndex = t;
@@ -129,17 +338,23 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class HomePageWidget extends StatefulWidget {
-  const HomePageWidget({Key key}) : super(key: key);
+  final Function pushCallback;
+
+  const HomePageWidget({Key key, this.pushCallback}) : super(key: key);
 
   @override
   _HomePageWidgetState createState() => _HomePageWidgetState();
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
+  @override
+  void initState() {
+    super.initState();
+  }
 
-  Widget getMain(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     return CustomScrollView(
-      // controller: _sc,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -151,7 +366,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             IconButton(
               icon: Icon(Icons.search),
               onPressed: () {
-                Navigator.pushNamed(context, '/search', arguments: false);
+                this.widget.pushCallback.call('/search', argument: false);
+                // Navigator.pushNamed(context, '/search', arguments: false);
               },
             ),
           ],
@@ -159,15 +375,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ],
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return getMain(context);
-  }
 }
 
 class FavouritesPageWidget extends StatefulWidget {
-  const FavouritesPageWidget({Key key}) : super(key: key);
+  final Function pushCallback;
+
+  const FavouritesPageWidget({Key key, this.pushCallback}) : super(key: key);
 
   @override
   _FavouritesPageWidgetState createState() => _FavouritesPageWidgetState();
@@ -200,7 +413,10 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
               name: e.name,
               coverURL: e.coverURL,
             ),
-            onTap: () => Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(e.id)),
+            onTap: () {
+              this.widget.pushCallback.call('/manga', argument: APIer.fetchManga(e.id));
+              // Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(e.id));
+            },
           ),
         ),
       );
@@ -217,7 +433,8 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
           IconButton(
             icon: Icon(Icons.search),
             onPressed: () {
-              Navigator.pushNamed(context, '/search', arguments: true);
+              this.widget.pushCallback.call('/search', argument: true);
+              // Navigator.pushNamed(context, '/search', arguments: true);
             },
           ),
         ],
@@ -265,8 +482,9 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
 
 class SearchPageWidget extends StatefulWidget {
   final bool includeDBResults;
+  final Function pushCallback;
 
-  const SearchPageWidget({Key key, this.includeDBResults}) : super(key: key);
+  const SearchPageWidget({Key key, this.includeDBResults, this.pushCallback}) : super(key: key);
 
   @override
   _SearchPageWidgetState createState() => _SearchPageWidgetState();
@@ -325,7 +543,6 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   void fetch([int limit = 10]) {
     startedLoading();
-    //TODO database fetch also
     _mangaQuery.limit = limit;
     _mangaQuery.offset = _hdFromAPI.length;
     APIer.fetchSearch(_mangaQuery).then((value) {
@@ -349,7 +566,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   void fetchAgain() {
     _hdFromAPI.clear();
     _finished = false;
-    if(this.widget.includeDBResults) {
+    if (this.widget.includeDBResults) {
       _hdFromDB.clear();
       fetchFromDatabase();
     }
@@ -447,7 +664,8 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                             isSaved: DBer.isSaved(hd1.id),
                           ),
                           onTap: () {
-                            Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(hd1.id));
+                            this.widget.pushCallback.call('/manga', argument: APIer.fetchManga(hd1.id));
+                            // Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(hd1.id));
                           },
                         );
                       }
@@ -476,8 +694,9 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
 
 class MangaPageWidget extends StatefulWidget {
   final Future<CompleteManga> current;
+  final Function pushCallback;
 
-  const MangaPageWidget({Key key, this.current}) : super(key: key);
+  const MangaPageWidget({Key key, this.current, this.pushCallback}) : super(key: key);
 
   @override
   _MangaPageWidgetState createState() => _MangaPageWidgetState();
@@ -542,6 +761,7 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
           },
           body: MangaPage(
             manga: _mn,
+            pushCallback: widget.pushCallback,
           ),
         ),
       );
@@ -551,12 +771,14 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
 
 class ReaderWidget extends StatefulWidget {
   // final double settingsWidth = 100;
-  final double settingsHeight = 100;
+  static final double settingsHeight = 100;
+  static final int maxCacheCount = 1;
 
   final Chapters current;
-  final int maxCacheCount = 1;
+  final Future<int> lastSave;
+  final Function pushCallback;
 
-  const ReaderWidget({Key key, this.current}) : super(key: key);
+  const ReaderWidget({Key key, this.current, this.lastSave, this.pushCallback}) : super(key: key);
 
   @override
   _ReaderWidgetState createState() => _ReaderWidgetState();
@@ -579,7 +801,6 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
   double _currentWheelRotation = 0;
 
-  //TODO some issue with dispose
   ScrollSynchronizer _synchronizer;
 
   int _formalIndexAtStartOfCurrentChapter = 0;
@@ -589,6 +810,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   Map<int, CompleteChapter> _chapIndexToChapter = {};
   Map<int, int> _chapStartsToChapIndex = {};
   List<int> _chapStarts = [];
+
+  String _currentChapterId;
 
   OverlayEntry _settings;
   LayerLink _link;
@@ -600,67 +823,62 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
   int _upperBoundIndex = -1;
 
-  int _batteryLevel;
-  DateTime _currTime = DateTime.now();
   int _currPage;
   int _currChapLength;
+  Stream _info;
 
   bool disposed = false;
-
-  int _lastKnownChapterIndex;
 
   @override
   void initState() {
     super.initState();
-    _lastKnownChapterIndex = widget.current.currentIndex;
     _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
-    listenForInfo(_battery, Duration(seconds: 1));
+    _info = infoStream(_battery);
     _animationControllerForAppBar = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 200),
     );
-    APIer.fetchChapterPageNumber(this.widget.current.mangaId, this.widget.current.chaps[this.widget.current.currentIndex].sequenceNumber).then((value) {
-      _formalIndexAtStartOfCurrentChapter = (value);
-      _formalIndexForList = _formalIndexAtStartOfCurrentChapter;
-      PageController pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter, keepPage: false);
-      ItemScrollController scrollController = ItemScrollController();
-      ItemPositionsListener scrollListener = ItemPositionsListener.create();
-      _synchronizer = new ScrollSynchronizer();
-      _synchronizer.attachPageControllerToAll([_LEFT_TO_RIGHT, _RIGHT_TO_LEFT], pageController);
-      _synchronizer.attachListController(_UP_TO_DOWN, scrollController, scrollListener);
-
-      _synchronizer.listen((t) {
-        _listen(t.getIndex());
-      });
-
-      assembleProper(_formalIndexAtStartOfCurrentChapter);
-    });
+    setup();
   }
 
-  //TODO some issue with mounted
-  void listenForInfo(Battery b, Duration d) async {
-    do {
-      await Future.delayed(d);
-      int nBat = await b.batteryLevel;
-      bool b2 = false;
-      DateTime nTime;
-      if (nBat != _batteryLevel) {
-        b2 = true;
-      }
-      nTime = DateTime.now();
-      if (nTime.minute != _currTime.minute) {
-        b2 = true;
-      }
-      if (b2) {
-        if (this.mounted) {
-          setState(() {
-            _batteryLevel = nBat;
-            _currTime = nTime;
-          });
-        }
-      }
-    } while (this.mounted);
+  void setup() async {
+    ChapterPosition position = await APIer.fetchChapterPageNumber(this.widget.current.mangaId, this.widget.current.chaps[this.widget.current.currentIndex].sequenceNumber);
+    int displayMode = await DBer.getPreferredScrollStyle(this.widget.current.mangaId);
+    if(displayMode != null) {
+      _displayMode = displayMode;
+    } else {
+      DBer.updatePreferredScrollStyle(this.widget.current.mangaId, _displayMode);
+    }
+    int pgNum = position.index;
+    _upperBoundIndex = position.length;
+    int currNum = await this.widget.lastSave;
+    _currentChapterId = this.widget.current.chaps[this.widget.current.currentIndex].id;
+    if (currNum == null) {
+      currNum = 0;
+    }
+    _formalIndexAtStartOfCurrentChapter = (pgNum);
+    _formalIndexForList = _formalIndexAtStartOfCurrentChapter + currNum;
+    PageController pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter + currNum, keepPage: false);
+    ItemScrollController scrollController = ItemScrollController();
+    ItemPositionsListener scrollListener = ItemPositionsListener.create();
+    _synchronizer = new ScrollSynchronizer();
+    _synchronizer.attachPageControllerToAll([_LEFT_TO_RIGHT, _RIGHT_TO_LEFT], pageController);
+    _synchronizer.attachListController(_UP_TO_DOWN, scrollController, scrollListener);
+
+    _synchronizer.listen((t) {
+      _listen(t.getIndex());
+    });
+
+    assembleProper(_formalIndexAtStartOfCurrentChapter, currNum);
+  }
+
+  Stream<InfoPanelData> infoStream(Battery b) async* {
+    while (this.mounted) {
+      int x = await b.batteryLevel;
+      String s = _formatter.format(DateTime.now());
+      yield InfoPanelData(x.toString(), s);
+    }
   }
 
   void _listen(int index) {
@@ -669,9 +887,11 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     if (chapIndex < 0) {
       return;
     }
-    if (chapIndex != _lastKnownChapterIndex) {
-      DBer.readChapter(widget.current.mangaId, widget.current.chaps[chapIndex].id);
+    if (_currentChapterId != widget.current.chaps[chapIndex].id) {
+      _currentChapterId = widget.current.chaps[chapIndex].id;
+      DBer.readChapter(widget.current.mangaId, _currentChapterId, index - chapStart);
     }
+    DBer.updateChapterPage(_currentChapterId, index - chapStart);
     int plusOne = chapIndex + 1;
     int minusOne = chapIndex - 1;
     if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
@@ -694,9 +914,6 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
         });
       });
     }
-    if (plusOne == this.widget.current.chaps.length) {
-      _upperBoundIndex = chapStart + _chapIndexToChapter[chapIndex].content.urls.length;
-    }
     int nCurr = index - chapStart + 1;
     int nLen = _chapIndexToChapter[chapIndex].content.urls.length;
     if (nCurr != _currPage) {
@@ -717,41 +934,34 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     return APIer.fetchChapter(dt.id).then((value) => CompleteChapter.all(dt.id, value, dt, this.widget.current.s));
   }
 
-  void assembleProper(int formalPageStart) {
+  void assembleProper(int formalPageStart, int currPage) async {
     int x = this.widget.current.currentIndex;
-    populateChapter(x).then((value) {
-      setState(() {
-        addProper(_chapStarts, formalPageStart);
-        _chapStartsToChapIndex.putIfAbsent(formalPageStart, () => x);
-        _currPage = 1;
-        _currChapLength = value.content.urls.length;
-      });
-      return value;
-    }).then((value) {
-      int plusOne = this.widget.current.currentIndex + 1;
-      if (plusOne < this.widget.current.chaps.length) {
-        _requestedNextChapterLoadIndex = plusOne;
-        populateChapter(plusOne).then((v1) {
-          int fps = formalPageStart + value.content.urls.length;
-          setState(() {
-            addProper(_chapStarts, fps);
-            _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
-          });
-        });
-      }
-      if (plusOne == this.widget.current.chaps.length) {
-        _upperBoundIndex = formalPageStart + value.content.urls.length;
-      }
+    CompleteChapter current = await populateChapter(x);
+    setState(() {
+      addProper(_chapStarts, formalPageStart);
+      _chapStartsToChapIndex.putIfAbsent(formalPageStart, () => x);
+      _currPage = currPage + 1;
+      _currChapLength = current.content.urls.length;
     });
+    DBer.readChapter(widget.current.mangaId, widget.current.chaps[widget.current.currentIndex].id, currPage);
+    int plusOne = this.widget.current.currentIndex + 1;
+    if (plusOne < this.widget.current.chaps.length) {
+      _requestedNextChapterLoadIndex = plusOne;
+      await populateChapter(plusOne);
+      int fps = formalPageStart + current.content.urls.length;
+      setState(() {
+        addProper(_chapStarts, fps);
+        _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
+      });
+    }
     int minusOne = this.widget.current.currentIndex - 1;
     if (minusOne > -1) {
       _requestedPreviousChapterLoadIndex = minusOne;
-      populateChapter(minusOne).then((value) {
-        int fps = formalPageStart - value.content.urls.length;
-        setState(() {
-          addProper(_chapStarts, fps);
-          _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
-        });
+      CompleteChapter prevOne = await populateChapter(minusOne);
+      int fps = formalPageStart - prevOne.content.urls.length;
+      setState(() {
+        addProper(_chapStarts, fps);
+        _chapStartsToChapIndex.putIfAbsent(fps, () => minusOne);
       });
     }
   }
@@ -897,7 +1107,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   void initSettings() {
     _settings = OverlayEntry(builder: (context) {
       return Positioned(
-        height: this.widget.settingsHeight,
+        height: ReaderWidget.settingsHeight,
         child: CompositedTransformFollower(
           link: _link,
           followerAnchor: Alignment.topRight,
@@ -910,6 +1120,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                 PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
                 _synchronizer.get(_LEFT_TO_RIGHT).setUnderlyingController(controller);
               }
+              DBer.updatePreferredScrollStyle(widget.current.mangaId, _LEFT_TO_RIGHT);
               setState(() => _displayMode = _LEFT_TO_RIGHT);
             },
             onRightToLeft: () {
@@ -918,10 +1129,12 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                 PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
                 _synchronizer.get(_RIGHT_TO_LEFT).setUnderlyingController(controller);
               }
+              DBer.updatePreferredScrollStyle(widget.current.mangaId, _RIGHT_TO_LEFT);
               setState(() => _displayMode = _RIGHT_TO_LEFT);
             },
             onUpToDown: () {
               _formalIndexForList = _synchronizer.get(_displayMode).getIndex();
+              DBer.updatePreferredScrollStyle(widget.current.mangaId, _UP_TO_DOWN);
               setState(() => _displayMode = _UP_TO_DOWN);
             },
           ),
@@ -980,7 +1193,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
       ),
       body: GestureDetector(
         onTap: () => toggleTopBar(),
-        onLongPressStart: (t) => toggleScrollWheel(t),
+        //TODO in v2
+        // onLongPressStart: (t) => toggleScrollWheel(t),
         child: Stack(
           children: [
             _displayMode == _UP_TO_DOWN
@@ -989,9 +1203,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                     itemPositionsListener: _synchronizer.get(_displayMode).getUnderlyingListener() as ItemPositionsListener,
                     itemScrollController: _synchronizer.get(_displayMode).getUnderlyingController() as ItemScrollController,
                     initialAlignment: 0,
-                    //TODO point of failure
-                    itemCount: _upperBoundIndex == -1 ? 100000 : _upperBoundIndex,
-
+                    itemCount: _upperBoundIndex,
                     itemBuilder: (context, index) {
                       int x1 = findChapStart(index);
                       Widget w;
@@ -1016,14 +1228,12 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                       return w;
                     },
                   )
-                : PageView.custom(
+                : PageView.builder(
                     allowImplicitScrolling: true,
                     controller: _synchronizer.get(_displayMode).getUnderlyingController() as PageController,
                     reverse: _displayMode == _RIGHT_TO_LEFT,
-                    childrenDelegate: SliverChildBuilderDelegate((context, index) {
-                      if (index == _upperBoundIndex) {
-                        return null;
-                      }
+                    itemCount: _upperBoundIndex,
+                    itemBuilder: (context, index) {
                       Widget w;
                       int x1 = findChapStart(index);
                       if (x1 < 0) {
@@ -1049,15 +1259,22 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                         }
                       }
                       return w;
-                    }),
+                    },
                   ),
             Positioned(
               bottom: 0,
               right: 0,
-              child: ReaderPageInfoPanel(
-                pageInfo: _currPage == null || _currChapLength == null ? "" : _currPage.toString() + "/" + _currChapLength.toString(),
-                dateString: _formatter.format(_currTime),
-                batteryString: _batteryLevel == null ? "" : "Battery: " + _batteryLevel.toString() + "%",
+              child: StreamBuilder(
+                stream: _info,
+                initialData: InfoPanelData("?", "?"),
+                builder: (context, snapshot) {
+                  InfoPanelData data = snapshot.data as InfoPanelData;
+                  return ReaderPageInfoPanel(
+                    pageInfo: _currPage == null || _currChapLength == null ? "?/?" : _currPage.toString() + "/" + _currChapLength.toString(),
+                    dateString: data.time,
+                    batteryString: "Battery: " + data.batteryLevel + "%",
+                  );
+                },
               ),
             ),
           ],
@@ -1246,6 +1463,20 @@ class CenteredFixedCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator()));
   }
+}
+
+class ReadArguments {
+  Chapters t;
+  Future<int> page;
+
+  ReadArguments.all(this.t, this.page);
+}
+
+class InfoPanelData {
+  String batteryLevel;
+  String time;
+
+  InfoPanelData(this.batteryLevel, this.time);
 }
 
 class DevHttpsOverides extends HttpOverrides {

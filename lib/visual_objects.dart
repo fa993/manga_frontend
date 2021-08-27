@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:manga_frontend/api_objects.dart';
@@ -289,12 +290,8 @@ class MangaPageButtonPanel extends StatelessWidget {
 }
 
 class MangaPageChapterPanel extends StatefulWidget {
-  final String mangaId;
-  final Map<int, ChapterData> chaps;
-  final Source s;
-  final int expandedIndex;
 
-  static Function(BuildContext, Chapters) onClick = (c, t) => {};
+  static Function(BuildContext, Chapters, Function) onClick = (c, t, f) => {};
 
   static String chapterToDisplayString(ChapterData dat) {
     if (dat != null) {
@@ -304,7 +301,13 @@ class MangaPageChapterPanel extends StatefulWidget {
     }
   }
 
-  const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex}) : super(key: key);
+  final String mangaId;
+  final Map<int, ChapterData> chaps;
+  final Source s;
+  final int expandedIndex;
+  final Function pushCallback;
+
+  const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex, this.pushCallback}) : super(key: key);
 
   @override
   _MangaPageChapterPanelState createState() => _MangaPageChapterPanelState();
@@ -333,7 +336,7 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 
   Function onClick(int index) {
     return (context) {
-      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s));
+      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s), this.widget.pushCallback);
     };
   }
 
@@ -578,8 +581,9 @@ class MangaPageChapterButton extends StatelessWidget {
 
 class MangaPage extends StatefulWidget {
   final CompleteManga manga;
+  final Function pushCallback;
 
-  const MangaPage({Key key, this.manga}) : super(key: key);
+  const MangaPage({Key key, this.manga, this.pushCallback}) : super(key: key);
 
   static String genresToString(List<Genre> input) {
     return input.map((e) => e.name[0].toUpperCase() + e.name.substring(1).toLowerCase()).join(', ');
@@ -615,6 +619,7 @@ class _MangaPageState extends State<MangaPage> {
               s: widget.manga.linkedMangas[index - 3 - 1].source,
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
               expandedIndex: index,
+              pushCallback: widget.pushCallback,
             );
           }
           switch (index) {
@@ -623,7 +628,7 @@ class _MangaPageState extends State<MangaPage> {
             case 1:
               return MangaPageDescription(description: widget.manga.description);
             case 2:
-              //TODO encapsulate this outside.. ideally you don't want any api call in this library
+              //TODO encapsulate this outside.. ideally you don't want any api call in this library/file
               return ValueListenableBuilder<int>(
                 valueListenable: _notifier,
                 builder: (context, junk, child) {
@@ -631,8 +636,10 @@ class _MangaPageState extends State<MangaPage> {
                     isFavourite: _isSaved == null ? DBer.isSaved(widget.manga.id) : Future.value(_isSaved),
                     onToggleFavourite: (b) {
                       if (!b) {
+                        FirebaseMessaging.instance.subscribeToTopic(widget.manga.id);
                         DBer.saveManga(widget.manga.id, widget.manga.title, widget.manga.coverURL, widget.manga.description, MangaPage.genresToString(widget.manga.genres)).then((value) => setState(() => _isSaved = true));
                       } else {
+                        FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.id);
                         DBer.removeManga(widget.manga.id).then((value) => setState(() => _isSaved = false));
                       }
                     },
@@ -643,7 +650,7 @@ class _MangaPageState extends State<MangaPage> {
                       return ChapterSlice.all(MangaPageChapterPanel.chapterToDisplayString(widget.manga.chapters[0]), 0);
                     }),
                     onClickReadChapter: (t) {
-                      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source));
+                      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
                     },
                   );
                 },
@@ -654,6 +661,7 @@ class _MangaPageState extends State<MangaPage> {
                 s: widget.manga.source,
                 chaps: widget.manga.chapters,
                 expandedIndex: 0,
+                pushCallback: widget.pushCallback,
               );
             default:
               return SizedBox(
