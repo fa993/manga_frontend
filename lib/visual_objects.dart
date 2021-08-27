@@ -291,8 +291,6 @@ class MangaPageButtonPanel extends StatelessWidget {
 
 class MangaPageChapterPanel extends StatefulWidget {
 
-  static Function(BuildContext, Chapters, Function) onClick = (c, t, f) => {};
-
   static String chapterToDisplayString(ChapterData dat) {
     if (dat != null) {
       return dat.chapterNumber == null || dat.chapterNumber.isEmpty ? dat.chapterName : dat.chapterNumber;
@@ -305,9 +303,9 @@ class MangaPageChapterPanel extends StatefulWidget {
   final Map<int, ChapterData> chaps;
   final Source s;
   final int expandedIndex;
-  final Function pushCallback;
+  final Function(String, int, int) onClickChapter;
 
-  const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex, this.pushCallback}) : super(key: key);
+  const MangaPageChapterPanel({Key key, this.mangaId, this.chaps, this.s, this.expandedIndex, this.onClickChapter}) : super(key: key);
 
   @override
   _MangaPageChapterPanelState createState() => _MangaPageChapterPanelState();
@@ -336,7 +334,8 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 
   Function onClick(int index) {
     return (context) {
-      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s), this.widget.pushCallback);
+      this.widget.onClickChapter.call(this.widget.mangaId, index, null);
+      // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s), this.widget.pushCallback);
     };
   }
 
@@ -402,7 +401,7 @@ class MangaPageChapterList extends StatelessWidget {
 }
 
 class MangaPageCustomChapterGrid extends StatefulWidget {
-  final Function onClick;
+  final Function(int) onClick;
   final Map<int, ChapterData> chaps;
 
   const MangaPageCustomChapterGrid({Key key, this.chaps, this.onClick}) : super(key: key);
@@ -556,7 +555,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 }
 
 class MangaPageChapterButton extends StatelessWidget {
-  final Function onClick;
+  final Function(BuildContext) onClick;
   final String displayName;
 
   const MangaPageChapterButton({Key key, this.onClick, this.displayName}) : super(key: key);
@@ -581,9 +580,9 @@ class MangaPageChapterButton extends StatelessWidget {
 
 class MangaPage extends StatefulWidget {
   final CompleteManga manga;
-  final Function pushCallback;
+  final Function(String, int, int) onClickChapter;
 
-  const MangaPage({Key key, this.manga, this.pushCallback}) : super(key: key);
+  const MangaPage({Key key, this.manga, this.onClickChapter}) : super(key: key);
 
   static String genresToString(List<Genre> input) {
     return input.map((e) => e.name[0].toUpperCase() + e.name.substring(1).toLowerCase()).join(', ');
@@ -602,6 +601,7 @@ class _MangaPageState extends State<MangaPage> {
   void initState() {
     super.initState();
     DBer.registerNotifierForChapter(_notifier);
+    Memory.retain(Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: -1, s: widget.manga.source));
   }
 
   @override
@@ -619,7 +619,7 @@ class _MangaPageState extends State<MangaPage> {
               s: widget.manga.linkedMangas[index - 3 - 1].source,
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
               expandedIndex: index,
-              pushCallback: widget.pushCallback,
+              onClickChapter: widget.onClickChapter,
             );
           }
           switch (index) {
@@ -650,7 +650,8 @@ class _MangaPageState extends State<MangaPage> {
                       return ChapterSlice.all(MangaPageChapterPanel.chapterToDisplayString(widget.manga.chapters[0]), 0);
                     }),
                     onClickReadChapter: (t) {
-                      MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
+                      widget.onClickChapter.call(widget.manga.id, t, null);
+                      // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
                     },
                   );
                 },
@@ -661,7 +662,7 @@ class _MangaPageState extends State<MangaPage> {
                 s: widget.manga.source,
                 chaps: widget.manga.chapters,
                 expandedIndex: 0,
-                pushCallback: widget.pushCallback,
+                onClickChapter: widget.onClickChapter,
               );
             default:
               return SizedBox(

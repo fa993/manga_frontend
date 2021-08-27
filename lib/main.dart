@@ -10,21 +10,18 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:uni_links/uni_links.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import 'api_objects.dart';
 import 'visual_objects.dart';
 
 void main() async {
-  HttpOverrides.global = new DevHttpsOverides();
-  MangaPageChapterPanel.onClick = (c, t, f) {
-    if (t.chaps[t.currentIndex] != null) {
-      // Navigator.pushNamed(c, "/read", arguments: ReadArguments.all(t, DBer.getLastReadPage(t.chaps[t.currentIndex].id)));
-      f.call('/read', argument: ReadArguments.all(t, DBer.getLastReadPage(t.chaps[t.currentIndex].id)));
-    }
-  };
+  HttpOverrides.global = new DevHttpsOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   DBer.initializeDatabase();
   runApp(MyApp());
@@ -82,70 +79,13 @@ class AppHome extends StatefulWidget {
 }
 
 class _AppHomeState extends State<AppHome> {
-  final List<Page> pages = [];
-  final _navigatorKey = GlobalKey<NavigatorState>();
-
-  @override
-  void initState() {
-    super.initState();
-    pages.add(MyRoute(
-      builder: (context) => MyHomePage(
-        pushCallback: pushCallback,
-      ),
-      key: const Key("HomePage"),
-    ));
-  }
-
-  bool _onPopPage(Route<dynamic> route, dynamic result) {
-    pages.remove(route.settings);
-    return route.didPop(result);
-  }
-
-  void pushCallback(String routeName, {dynamic argument}) {
-    final Uri path = Uri.parse(routeName);
-    for (String segment in path.pathSegments) {
-      if (segment == 'search') {
-        pages.add(MyRoute(
-          builder: (context) => SearchPageWidget(
-            includeDBResults: argument as bool,
-            pushCallback: pushCallback,
-          ),
-          key: const Key("SearchPage"),
-        ));
-      } else if (segment == 'manga') {
-        pages.add(MyRoute(
-          builder: (context) => MangaPageWidget(
-            current: argument as Future<CompleteManga>,
-            pushCallback: pushCallback,
-          ),
-          key: const Key("MangaPage"),
-        ));
-      } else if (segment == 'read') {
-        ReadArguments arg = argument as ReadArguments;
-        pages.add(MyRoute(
-          builder: (context) => ReaderWidget(
-            current: arg.t,
-            lastSave: arg.page,
-            pushCallback: pushCallback,
-          ),
-          key: const Key("ReadPage"),
-        ));
-      } else {
-        pages.add(MyRoute(
-          builder: (context) => LostPage(),
-          key: const Key("LostPage"),
-        ));
-        break;
-      }
-    }
-    setState(() {});
-  }
-
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
+    return MaterialApp.router(
+      routeInformationParser: MangaRouteInformationParser(),
+      routerDelegate: MangaRouteDelegate(),
+      title: 'MangaVerse',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -161,39 +101,6 @@ class _AppHomeState extends State<AppHome> {
         fontFamily: DefaultTextStyle.of(context).style.fontFamily,
         backgroundColor: Colors.black,
       ),
-      home: WillPopScope(
-        onWillPop: () async => !await _navigatorKey.currentState.maybePop(),
-        child: Navigator(
-          key: _navigatorKey,
-          pages: List.unmodifiable(pages),
-          onPopPage: _onPopPage,
-        ),
-      ),
-      // home: MyHomePage(),
-      // onGenerateRoute: (settings) {
-      //   if (settings.name == '/search') {
-      //     return MaterialPageRoute(
-      //       builder: (context) => SearchPageWidget(
-      //         includeDBResults: settings.arguments as bool,
-      //       ),
-      //     );
-      //   } else if (settings.name == '/manga') {
-      //     return MaterialPageRoute(
-      //       builder: (context) => MangaPageWidget(
-      //         current: settings.arguments as Future<CompleteManga>,
-      //       ),
-      //     );
-      //   } else if (settings.name == '/read') {
-      //     ReadArguments arg = settings.arguments as ReadArguments;
-      //     return MaterialPageRoute(
-      //       builder: (context) => ReaderWidget(
-      //         current: arg.t,
-      //         lastSave: arg.page,
-      //       ),
-      //     );
-      //   }
-      //   return null;
-      // },
     );
   }
 }
@@ -217,99 +124,426 @@ class LostPage extends StatelessWidget {
   }
 }
 
-// enum RouteType { HOME_ROUTE, SEARCH_ROUTE, MANGA_PAGE_ROUTE, READER_ROUTE, LOST_ROUTE }
-//
-// class MangaRoutePath {
-//   RouteType routeType;
-//   String id;
-//   ReadArguments rd;
-//   Future<CompleteManga> current;
-//
-//   MangaRoutePath({this.routeType, this.id, this.rd, this.current});
-//
-//   factory MangaRoutePath.home() {
-//     return new MangaRoutePath(
-//       routeType: RouteType.HOME_ROUTE,
-//     );
-//   }
-//
-//   factory MangaRoutePath.search() {
-//     return new MangaRoutePath(
-//       routeType: RouteType.SEARCH_ROUTE,
-//     );
-//   }
-//
-//   factory MangaRoutePath.manga(Future<CompleteManga> current) {
-//     return new MangaRoutePath(
-//       routeType: RouteType.MANGA_PAGE_ROUTE,
-//       current: current,
-//     );
-//   }
-//
-//   factory MangaRoutePath.reader(ReadArguments rd) {
-//     return new MangaRoutePath(
-//       routeType: RouteType.READER_ROUTE,
-//       rd: rd,
-//     );
-//   }
-//
-//   factory MangaRoutePath.lost() {
-//     return new MangaRoutePath(
-//       routeType: RouteType.LOST_ROUTE,
-//     );
-//   }
-// }
-//
-//
-// class MangaRouteInformationParser extends RouteInformationParser<MangaRoutePath> {
-//   @override
-//   Future<MangaRoutePath> parseRouteInformation(RouteInformation routeInformation) async {
-//     final uri = Uri.parse(routeInformation.location);
-//     switch (uri.pathSegments.length) {
-//       case 0:
-//         return MangaRoutePath.home();
-//       case 1:
-//         return uri.pathSegments[0] == "search" ? MangaRoutePath.search() : MangaRoutePath.manga(null);
-//       case 2:
-//         return MangaRoutePath.reader(null);
-//       default:
-//         return MangaRoutePath.lost();
-//     }
-//   }
-//
-//   @override
-//   RouteInformation restoreRouteInformation(MangaRoutePath configuration) {
-//     return null;
-//   }
-// }
+enum RouteType { HOME_ROUTE, SEARCH_ROUTE, MANGA_PAGE_ROUTE, READER_ROUTE, LOST_ROUTE, READER_DIRECT_ROUTE, MANGA_PAGE_DIRECT_ROUTE }
+
+class MangaRoutePath {
+  RouteType routeType;
+  bool includeDB;
+  String mangaId;
+  int index;
+  int pgNum;
+
+  MangaRoutePath({this.routeType, this.mangaId, this.index, this.pgNum, this.includeDB});
+
+  factory MangaRoutePath.home() {
+    return new MangaRoutePath(
+      routeType: RouteType.HOME_ROUTE,
+    );
+  }
+
+  factory MangaRoutePath.search(bool includeDB) {
+    return new MangaRoutePath(
+      routeType: RouteType.SEARCH_ROUTE,
+      includeDB: includeDB,
+    );
+  }
+
+  factory MangaRoutePath.manga(String mangaId) {
+    return new MangaRoutePath(
+      routeType: RouteType.MANGA_PAGE_ROUTE,
+      mangaId: mangaId,
+    );
+  }
+
+  factory MangaRoutePath.mangaDirect(String mangaId) {
+    return new MangaRoutePath(
+      routeType: RouteType.MANGA_PAGE_DIRECT_ROUTE,
+      mangaId: mangaId,
+    );
+  }
+
+  factory MangaRoutePath.reader(String mangaId, int id) {
+    return new MangaRoutePath(
+      routeType: RouteType.READER_ROUTE,
+      mangaId: mangaId,
+      index: id,
+    );
+  }
+
+  factory MangaRoutePath.readerPrecise(String mangaId, int id, int pgNum) {
+    return new MangaRoutePath(
+      routeType: RouteType.READER_ROUTE,
+      mangaId: mangaId,
+      index: id,
+      pgNum: pgNum,
+    );
+  }
+
+  factory MangaRoutePath.readerDirect(String mangaId, int id) {
+    return new MangaRoutePath(
+      routeType: RouteType.READER_DIRECT_ROUTE,
+      mangaId: mangaId,
+      index: id,
+    );
+  }
+
+  factory MangaRoutePath.readerPreciseDirect(String mangaId, int id, int pgNum) {
+    return new MangaRoutePath(
+      routeType: RouteType.READER_DIRECT_ROUTE,
+      mangaId: mangaId,
+      index: id,
+      pgNum: pgNum,
+    );
+  }
+
+  factory MangaRoutePath.lost() {
+    return new MangaRoutePath(
+      routeType: RouteType.LOST_ROUTE,
+    );
+  }
+}
+
+class MangaRouteInformationParser extends RouteInformationParser<MangaRoutePath> {
+  @override
+  Future<MangaRoutePath> parseRouteInformation(RouteInformation routeInformation) async {
+    final uri = Uri.parse(routeInformation.location);
+    Map<String, String> args = uri.queryParameters;
+    MangaRoutePath ret = MangaRoutePath.lost();
+    switch (uri.pathSegments.length) {
+      case 0:
+        ret = MangaRoutePath.home();
+        break;
+      case 1:
+        if (uri.pathSegments[0] == "search") {
+          if (args.containsKey('includeDB') && args['includeDB'] as bool) {
+            ret = MangaRoutePath.search(true);
+          }
+          ret = MangaRoutePath.search(false);
+        } else if (uri.pathSegments[0] == "manga" && args.containsKey('mangaId')) {
+          ret = MangaRoutePath.manga(args['mangaId']);
+        } else if (uri.pathSegments[0] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
+          if (args.containsKey('page')) {
+            ret = MangaRoutePath.readerPrecise(args['mangaId'], args['index'] as int, args['page'] as int);
+          } else {
+            ret = MangaRoutePath.reader(args['mangaId'], args['index'] as int);
+          }
+        }
+        break;
+      case 2:
+        if (uri.pathSegments[0] == 'direct') {
+          if (uri.pathSegments[1] == "manga" && args.containsKey('mangaId')) {
+            ret = MangaRoutePath.mangaDirect(args['mangaId']);
+          } else if (uri.pathSegments[1] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
+            if (args.containsKey('page')) {
+              ret = MangaRoutePath.readerPreciseDirect(args['mangaId'], args['index'] as int, args['page'] as int);
+            } else {
+              ret = MangaRoutePath.readerDirect(args['mangaId'], args['index'] as int);
+            }
+          }
+        }
+        break;
+    }
+    return SynchronousFuture(ret);
+  }
+
+  @override
+  RouteInformation restoreRouteInformation(MangaRoutePath configuration) {
+    switch (configuration.routeType) {
+      case RouteType.HOME_ROUTE:
+        return RouteInformation(location: '/');
+      case RouteType.SEARCH_ROUTE:
+        return RouteInformation(location: '/search?includeDB=${configuration.includeDB}');
+      case RouteType.MANGA_PAGE_DIRECT_ROUTE:
+        return RouteInformation(location: '/direct/manga?mangaId=${configuration.index}');
+      case RouteType.MANGA_PAGE_ROUTE:
+        return RouteInformation(location: '/manga?mangaId=${configuration.index}');
+      case RouteType.READER_DIRECT_ROUTE:
+        int pg = configuration.pgNum;
+        if (pg != null) {
+          return RouteInformation(location: '/direct/read?mangaId=${configuration.mangaId}&index=${configuration.index}&page=$pg');
+        } else {
+          return RouteInformation(location: '/direct/read?mangaId=${configuration.mangaId}&index=${configuration.index}');
+        }
+        break;
+      case RouteType.READER_ROUTE:
+        int pg = configuration.pgNum;
+        if (pg != null) {
+          return RouteInformation(location: '/read?mangaId=${configuration.mangaId}&index=${configuration.index}&page=$pg');
+        } else {
+          return RouteInformation(location: '/read?mangaId=${configuration.mangaId}&index=${configuration.index}');
+        }
+        break;
+      default:
+        return RouteInformation(location: '/404');
+    }
+  }
+}
+
+class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotifier, PopNavigatorRouterDelegateMixin<MangaRoutePath> {
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  final List<Page> pages = [];
+
+  MangaRouteDelegate() : navigatorKey = GlobalKey<NavigatorState>() {
+    pages.add(
+      MyRoute(
+        key: ValueKey('HomePage'),
+        builder: (context) => MyHomePage(
+          onSearchPageClick: pushSearchPage,
+          onMangaClick: pushMangaPage,
+        ),
+      ),
+    );
+  }
+
+  void pushHomePage() {
+    pages.clear();
+    pages.add(
+      MyRoute(
+        key: ValueKey('HomePage'),
+        builder: (context) => MyHomePage(
+          onSearchPageClick: pushSearchPage,
+          onMangaClick: pushMangaPage,
+          pushDirectToManga: pushDirectlyToManga,
+          pushDirectToReader: pushDirectlyToChapter,
+          pushToLost: pushLostPage,
+        ),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void pushLostPage() {
+    pages.add(
+      MyRoute(
+        key: ValueKey('LostPage'),
+        builder: (context) => LostPage(),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void pushMangaPage(String mangaId) {
+    pages.add(
+      MyRoute(
+        builder: (context) => MangaPageWidget(
+          mangaId: mangaId,
+          onChapterClicked: pushReaderPage,
+        ),
+        key: ValueKey('MangaPage'),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void pushReaderPage(String mangaId, int index, int pgNum) {
+    pages.add(
+      MyRoute(
+        builder: (context) => ReaderWidget(
+          mangaId: mangaId,
+          index: index,
+          onPageTurned: pageTurnCallback,
+          lastSave: pgNum,
+        ),
+        key: ValueKey('ReaderPage'),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void pushSearchPage(bool includeDB) {
+    pages.add(
+      MyRoute(
+        builder: (context) => SearchPageWidget(
+          includeDBResults: includeDB,
+          onClickManga: pushMangaPage,
+        ),
+        key: ValueKey('SearchPage'),
+      ),
+    );
+    notifyListeners();
+  }
+
+  void pageTurnCallback(int pgNum) {
+    notifyListeners();
+  }
+
+  void pushDirectlyToManga(String mangaId) {
+    pushMangaPage(mangaId);
+  }
+
+  void pushDirectlyToChapter(String mangaId, int index, int pgNum) {
+    pages.add(
+      MyRoute(
+        builder: (context) => MangaPageWidget(
+          mangaId: mangaId,
+          onChapterClicked: pushReaderPage,
+        ),
+        key: ValueKey('MangaPage'),
+      ),
+    );
+    pushReaderPage(mangaId, index, pgNum);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Navigator(
+      key: navigatorKey,
+      pages: List.unmodifiable(pages),
+      onPopPage: (route, result) {
+        if (!route.didPop(result)) {
+          return false;
+        }
+        pages.removeLast();
+        notifyListeners();
+        return true;
+      },
+    );
+  }
+
+  @override
+  Future<void> setNewRoutePath(MangaRoutePath configuration) {
+    switch (configuration.routeType) {
+      case RouteType.HOME_ROUTE:
+        pushHomePage();
+        break;
+      case RouteType.SEARCH_ROUTE:
+        pushSearchPage(configuration.includeDB);
+        break;
+      case RouteType.MANGA_PAGE_ROUTE:
+        pushMangaPage(configuration.mangaId);
+        break;
+      case RouteType.READER_ROUTE:
+        int pg = configuration.pgNum;
+        if (pg != null) {
+          pushReaderPage(configuration.mangaId, configuration.index, pg);
+        } else {
+          pushReaderPage(configuration.mangaId, configuration.index, null);
+        }
+        break;
+      case RouteType.MANGA_PAGE_DIRECT_ROUTE:
+        pushDirectlyToManga(configuration.mangaId);
+        break;
+      case RouteType.READER_DIRECT_ROUTE:
+        int pg = configuration.pgNum;
+        if (pg != null) {
+          pushDirectlyToChapter(configuration.mangaId, configuration.index, pg);
+        } else {
+          pushDirectlyToChapter(configuration.mangaId, configuration.index, null);
+        }
+        break;
+      default:
+        pushLostPage();
+    }
+    return SynchronousFuture(null);
+  }
+}
 
 class MyHomePage extends StatefulWidget {
   final String title;
-  final Function pushCallback;
+  final Function(bool) onSearchPageClick;
+  final Function(String) onMangaClick;
+  final Function(String) pushDirectToManga;
+  final Function(String, int, int) pushDirectToReader;
+  final Function pushToLost;
 
-  const MyHomePage({Key key, this.title, this.pushCallback}) : super(key: key);
+  const MyHomePage({Key key, this.title, this.onSearchPageClick, this.onMangaClick, this.pushDirectToManga, this.pushDirectToReader, this.pushToLost}) : super(key: key);
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  static bool _handledFirstLink = false;
+
   int _selectionIndex = 0;
 
   List<Widget> _actualNavs;
 
+  StreamSubscription _streamSubscription;
+
   @override
   void initState() {
     super.initState();
+    _handleInitUri();
+    _handleSub();
+    setupInteractedMessage();
     _actualNavs = <Widget>[
       new HomePageWidget(
-        pushCallback: this.widget.pushCallback,
+        onSearchClicked: this.widget.onSearchPageClick,
       ),
       new FavouritesPageWidget(
-        pushCallback: this.widget.pushCallback,
+        onSearchClicked: this.widget.onSearchPageClick,
+        onMangaClicked: this.widget.onMangaClick,
       ),
       new ProfilePageWidget(),
     ];
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _streamSubscription.cancel();
+  }
+
+  void _handleInitUri() async {
+    if (!_handledFirstLink) {
+      _handledFirstLink = true;
+      try {
+        parseUri(await getInitialUri());
+      } on PlatformException {
+        print('failed to get initial uri');
+      } on FormatException {
+        print('malformed initial uri');
+        if (!mounted) {
+          return;
+        }
+      }
+    }
+  }
+
+  void _handleSub() {
+    if (!kIsWeb) {
+      _streamSubscription = uriLinkStream.listen(parseUri);
+    }
+  }
+
+  Future<void> setupInteractedMessage() async {
+    RemoteMessage initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+
+    if (initialMessage != null) {
+      _handleMessage(initialMessage);
+    }
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
+  }
+
+  void _handleMessage(RemoteMessage message) {
+    if (message.data.containsKey('uri')) {
+      parseUri(message.data['uri']);
+    }
+  }
+
+  void parseUri(Uri uri) {
+    if (!mounted) {
+      return;
+    }
+    if (uri != null) {
+      if (uri.pathSegments.length == 2 && uri.pathSegments[0] == 'direct') {
+        Map<String, String> args = uri.queryParameters;
+        if (uri.pathSegments[1] == "manga" && args.containsKey('mangaId')) {
+          this.widget.pushDirectToManga.call(args['mangaId']);
+          return;
+        } else if (uri.pathSegments[1] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
+          int pgNum;
+          if (args.containsKey('page')) {
+            pgNum = args['page'] as int;
+          }
+          this.widget.pushDirectToReader.call(args['mangaId'], args['index'] as int, pgNum);
+          return;
+        }
+      }
+      this.widget.pushToLost.call();
+    }
   }
 
   @override
@@ -338,9 +572,9 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class HomePageWidget extends StatefulWidget {
-  final Function pushCallback;
+  final Function(bool) onSearchClicked;
 
-  const HomePageWidget({Key key, this.pushCallback}) : super(key: key);
+  const HomePageWidget({Key key, this.onSearchClicked}) : super(key: key);
 
   @override
   _HomePageWidgetState createState() => _HomePageWidgetState();
@@ -366,7 +600,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             IconButton(
               icon: Icon(Icons.search),
               onPressed: () {
-                this.widget.pushCallback.call('/search', argument: false);
+                this.widget.onSearchClicked.call(false);
                 // Navigator.pushNamed(context, '/search', arguments: false);
               },
             ),
@@ -378,9 +612,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 }
 
 class FavouritesPageWidget extends StatefulWidget {
-  final Function pushCallback;
+  final Function(bool) onSearchClicked;
+  final Function(String) onMangaClicked;
 
-  const FavouritesPageWidget({Key key, this.pushCallback}) : super(key: key);
+  const FavouritesPageWidget({Key key, this.onSearchClicked, this.onMangaClicked}) : super(key: key);
 
   @override
   _FavouritesPageWidgetState createState() => _FavouritesPageWidgetState();
@@ -414,7 +649,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
               coverURL: e.coverURL,
             ),
             onTap: () {
-              this.widget.pushCallback.call('/manga', argument: APIer.fetchManga(e.id));
+              this.widget.onMangaClicked.call(e.id);
               // Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(e.id));
             },
           ),
@@ -433,7 +668,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
           IconButton(
             icon: Icon(Icons.search),
             onPressed: () {
-              this.widget.pushCallback.call('/search', argument: true);
+              this.widget.onSearchClicked.call(true);
               // Navigator.pushNamed(context, '/search', arguments: true);
             },
           ),
@@ -482,9 +717,9 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
 
 class SearchPageWidget extends StatefulWidget {
   final bool includeDBResults;
-  final Function pushCallback;
+  final Function(String) onClickManga;
 
-  const SearchPageWidget({Key key, this.includeDBResults, this.pushCallback}) : super(key: key);
+  const SearchPageWidget({Key key, this.includeDBResults, this.onClickManga}) : super(key: key);
 
   @override
   _SearchPageWidgetState createState() => _SearchPageWidgetState();
@@ -664,7 +899,8 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                             isSaved: DBer.isSaved(hd1.id),
                           ),
                           onTap: () {
-                            this.widget.pushCallback.call('/manga', argument: APIer.fetchManga(hd1.id));
+                            this.widget.onClickManga(hd1.id);
+                            // this.widget.pushCallback.call('/manga', argument: APIer.fetchManga(hd1.id));
                             // Navigator.pushNamed(context, "/manga", arguments: APIer.fetchManga(hd1.id));
                           },
                         );
@@ -693,10 +929,10 @@ class _ProfilePageWidgetState extends State<ProfilePageWidget> {
 }
 
 class MangaPageWidget extends StatefulWidget {
-  final Future<CompleteManga> current;
-  final Function pushCallback;
+  final String mangaId;
+  final Function(String, int, int) onChapterClicked;
 
-  const MangaPageWidget({Key key, this.current, this.pushCallback}) : super(key: key);
+  const MangaPageWidget({Key key, this.mangaId, this.onChapterClicked}) : super(key: key);
 
   @override
   _MangaPageWidgetState createState() => _MangaPageWidgetState();
@@ -711,7 +947,7 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
   @override
   void initState() {
     super.initState();
-    this.widget.current.then((value) => setState(() => _mn = value));
+    APIer.fetchManga(this.widget.mangaId).then((value) => setState(() => _mn = value));
   }
 
   @override
@@ -761,7 +997,7 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
           },
           body: MangaPage(
             manga: _mn,
-            pushCallback: widget.pushCallback,
+            onClickChapter: widget.onChapterClicked,
           ),
         ),
       );
@@ -774,11 +1010,12 @@ class ReaderWidget extends StatefulWidget {
   static final double settingsHeight = 100;
   static final int maxCacheCount = 1;
 
-  final Chapters current;
-  final Future<int> lastSave;
-  final Function pushCallback;
+  final String mangaId;
+  final int index;
+  final int lastSave;
+  final Function(int) onPageTurned;
 
-  const ReaderWidget({Key key, this.current, this.lastSave, this.pushCallback}) : super(key: key);
+  const ReaderWidget({Key key, this.mangaId, this.index, this.lastSave, this.onPageTurned}) : super(key: key);
 
   @override
   _ReaderWidgetState createState() => _ReaderWidgetState();
@@ -794,6 +1031,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
 
   static const int thresholdForWheelPopOut = 30;
   static const double wheelRadius = 80.0;
+
+  Chapters _current;
 
   bool _visible = false;
   RestartableTimer _timer;
@@ -812,6 +1051,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   List<int> _chapStarts = [];
 
   String _currentChapterId;
+  int _currIndex;
 
   OverlayEntry _settings;
   LayerLink _link;
@@ -832,6 +1072,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    _current = Memory.remember(this.widget.mangaId, this.widget.index);
     _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
     _info = infoStream(_battery);
@@ -843,20 +1084,27 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   }
 
   void setup() async {
-    ChapterPosition position = await APIer.fetchChapterPageNumber(this.widget.current.mangaId, this.widget.current.chaps[this.widget.current.currentIndex].sequenceNumber);
-    int displayMode = await DBer.getPreferredScrollStyle(this.widget.current.mangaId);
-    if(displayMode != null) {
+    ChapterPosition position = await APIer.fetchChapterPageNumber(_current.mangaId, _current.chaps[_current.currentIndex].sequenceNumber);
+    int displayMode = await DBer.getPreferredScrollStyle(_current.mangaId);
+    if (displayMode != null) {
       _displayMode = displayMode;
     } else {
-      DBer.updatePreferredScrollStyle(this.widget.current.mangaId, _displayMode);
+      DBer.updatePreferredScrollStyle(_current.mangaId, _displayMode);
     }
     int pgNum = position.index;
     _upperBoundIndex = position.length;
-    int currNum = await this.widget.lastSave;
-    _currentChapterId = this.widget.current.chaps[this.widget.current.currentIndex].id;
-    if (currNum == null) {
-      currNum = 0;
+    _currentChapterId = _current.chaps[_current.currentIndex].id;
+    int currNum;
+    if (this.widget.lastSave == null) {
+      currNum = await DBer.getLastReadPage(_currentChapterId);
+      if (currNum == null) {
+        currNum = 0;
+      }
+    } else {
+      currNum = this.widget.lastSave;
     }
+    _currIndex = currNum;
+    DBer.readChapter(_current.mangaId, _current.chaps[_current.currentIndex].id, currNum);
     _formalIndexAtStartOfCurrentChapter = (pgNum);
     _formalIndexForList = _formalIndexAtStartOfCurrentChapter + currNum;
     PageController pageController = PageController(initialPage: _formalIndexAtStartOfCurrentChapter + currNum, keepPage: false);
@@ -887,14 +1135,20 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     if (chapIndex < 0) {
       return;
     }
-    if (_currentChapterId != widget.current.chaps[chapIndex].id) {
-      _currentChapterId = widget.current.chaps[chapIndex].id;
-      DBer.readChapter(widget.current.mangaId, _currentChapterId, index - chapStart);
+    int nCurr = index - chapStart + 1;
+    int nIn = nCurr - 1;
+    if (_currentChapterId != _current.chaps[chapIndex].id) {
+      _currentChapterId = _current.chaps[chapIndex].id;
+      DBer.readChapter(_current.mangaId, _currentChapterId, nIn);
     }
-    DBer.updateChapterPage(_currentChapterId, index - chapStart);
+    if(nIn != _currIndex) {
+      _currIndex = nIn;
+      DBer.updateChapterPage(_currentChapterId, nIn);
+      this.widget.onPageTurned.call(nCurr);
+    }
     int plusOne = chapIndex + 1;
     int minusOne = chapIndex - 1;
-    if (plusOne < this.widget.current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
+    if (plusOne < _current.chaps.length && !_chapIndexToChapter.containsKey(plusOne) && _requestedNextChapterLoadIndex != plusOne) {
       _requestedNextChapterLoadIndex = plusOne;
       populateChapter(plusOne).then((value) {
         int fps = chapStart + _chapIndexToChapter[chapIndex].content.urls.length;
@@ -914,7 +1168,6 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
         });
       });
     }
-    int nCurr = index - chapStart + 1;
     int nLen = _chapIndexToChapter[chapIndex].content.urls.length;
     if (nCurr != _currPage) {
       setState(() => _currPage = nCurr);
@@ -925,17 +1178,17 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   }
 
   Future<CompleteChapter> getChapter(int index) {
-    if (index >= this.widget.current.chaps.length) {
+    if (index >= _current.chaps.length) {
       throw new Exception("index out of bounds");
     } else if (index < 0) {
       throw new Exception("index out of bounds");
     }
-    ChapterData dt = this.widget.current.chaps[index];
-    return APIer.fetchChapter(dt.id).then((value) => CompleteChapter.all(dt.id, value, dt, this.widget.current.s));
+    ChapterData dt = _current.chaps[index];
+    return APIer.fetchChapter(dt.id).then((value) => CompleteChapter.all(dt.id, value, dt, _current.s));
   }
 
   void assembleProper(int formalPageStart, int currPage) async {
-    int x = this.widget.current.currentIndex;
+    int x = _current.currentIndex;
     CompleteChapter current = await populateChapter(x);
     setState(() {
       addProper(_chapStarts, formalPageStart);
@@ -943,9 +1196,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
       _currPage = currPage + 1;
       _currChapLength = current.content.urls.length;
     });
-    DBer.readChapter(widget.current.mangaId, widget.current.chaps[widget.current.currentIndex].id, currPage);
-    int plusOne = this.widget.current.currentIndex + 1;
-    if (plusOne < this.widget.current.chaps.length) {
+    int plusOne = _current.currentIndex + 1;
+    if (plusOne < _current.chaps.length) {
       _requestedNextChapterLoadIndex = plusOne;
       await populateChapter(plusOne);
       int fps = formalPageStart + current.content.urls.length;
@@ -954,7 +1206,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
         _chapStartsToChapIndex.putIfAbsent(fps, () => plusOne);
       });
     }
-    int minusOne = this.widget.current.currentIndex - 1;
+    int minusOne = _current.currentIndex - 1;
     if (minusOne > -1) {
       _requestedPreviousChapterLoadIndex = minusOne;
       CompleteChapter prevOne = await populateChapter(minusOne);
@@ -1120,7 +1372,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                 PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
                 _synchronizer.get(_LEFT_TO_RIGHT).setUnderlyingController(controller);
               }
-              DBer.updatePreferredScrollStyle(widget.current.mangaId, _LEFT_TO_RIGHT);
+              DBer.updatePreferredScrollStyle(_current.mangaId, _LEFT_TO_RIGHT);
               setState(() => _displayMode = _LEFT_TO_RIGHT);
             },
             onRightToLeft: () {
@@ -1129,12 +1381,12 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
                 PageController controller = PageController(initialPage: old.getIndex(), keepPage: false);
                 _synchronizer.get(_RIGHT_TO_LEFT).setUnderlyingController(controller);
               }
-              DBer.updatePreferredScrollStyle(widget.current.mangaId, _RIGHT_TO_LEFT);
+              DBer.updatePreferredScrollStyle(_current.mangaId, _RIGHT_TO_LEFT);
               setState(() => _displayMode = _RIGHT_TO_LEFT);
             },
             onUpToDown: () {
               _formalIndexForList = _synchronizer.get(_displayMode).getIndex();
-              DBer.updatePreferredScrollStyle(widget.current.mangaId, _UP_TO_DOWN);
+              DBer.updatePreferredScrollStyle(_current.mangaId, _UP_TO_DOWN);
               setState(() => _displayMode = _UP_TO_DOWN);
             },
           ),
@@ -1465,13 +1717,6 @@ class CenteredFixedCircle extends StatelessWidget {
   }
 }
 
-class ReadArguments {
-  Chapters t;
-  Future<int> page;
-
-  ReadArguments.all(this.t, this.page);
-}
-
 class InfoPanelData {
   String batteryLevel;
   String time;
@@ -1479,7 +1724,7 @@ class InfoPanelData {
   InfoPanelData(this.batteryLevel, this.time);
 }
 
-class DevHttpsOverides extends HttpOverrides {
+class DevHttpsOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext context) {
     return super.createHttpClient(context)..badCertificateCallback = (X509Certificate cert, String host, int port) => true;

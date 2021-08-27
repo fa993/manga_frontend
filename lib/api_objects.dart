@@ -288,7 +288,6 @@ class DBer {
     await _mangaDB.update(
       _chapterTableName,
       ReadChapter.all(
-        chapterId: chapterId,
         pageNumber: pgNum,
         timestamp: DateTime.now().millisecondsSinceEpoch,
       ).toMap(),
@@ -341,6 +340,36 @@ class DBer {
   }
 }
 
+class Memory {
+
+  static Map<String, Chapters> _manga = {};
+
+  static String _message;
+
+  static void retain(Chapters mg) {
+    _manga[mg.mangaId] = mg;
+  }
+
+  static Chapters remember(String mangaId, int index){
+    Chapters mg = _manga[mangaId];
+    return Chapters.all(
+      s: mg.s,
+      currentIndex: index,
+      mangaId: mangaId,
+      chaps: mg.chaps,
+    );
+  }
+
+  static void rememberQuick(String message) {
+    _message = message;
+  }
+
+  static String retainQuick() {
+    return _message;
+  }
+
+}
+
 class MangaPreference {
   String mangaId;
   int displayStyle;
@@ -364,11 +393,12 @@ class ReadChapter {
   ReadChapter.all({this.chapterId, this.timestamp, this.mangaId, this.pageNumber});
 
   Map<String, dynamic> toMap() {
+
     return {
-      'manga_id': mangaId,
-      'chapter_id': chapterId,
-      'chapter_read_time': timestamp,
-      'chapter_page': pageNumber,
+      if(mangaId != null) 'manga_id': mangaId,
+      if(chapterId!= null) 'chapter_id': chapterId,
+      if(timestamp != null) 'chapter_read_time': timestamp,
+      if(pageNumber != null) 'chapter_page': pageNumber,
     };
   }
 }
