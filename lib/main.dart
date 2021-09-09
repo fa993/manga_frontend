@@ -10,12 +10,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
-import 'package:uni_links/uni_links.dart';
-import 'package:flutter/services.dart' show PlatformException;
 
 import 'api_objects.dart';
 import 'visual_objects.dart';
@@ -283,33 +280,23 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
   final GlobalKey<NavigatorState> navigatorKey;
 
   final List<Page> pages = [];
+  Page homePage;
 
   MangaRouteDelegate() : navigatorKey = GlobalKey<NavigatorState>() {
-    pages.add(
-      MyRoute(
-        key: ValueKey('HomePage'),
-        builder: (context) => MyHomePage(
-          onSearchPageClick: pushSearchPage,
-          onMangaClick: pushMangaPage,
-        ),
+    homePage = MyRoute(
+      key: ValueKey('HomePage'),
+      builder: (context) => MyHomePage(
+        onSearchPageClick: pushSearchPage,
+        onMangaClick: pushMangaPage,
+        pushDirectToManga: pushDirectlyToManga,
+        pushDirectToReader: pushDirectlyToChapter,
+        pushToLost: pushLostPage,
       ),
     );
   }
 
   void pushHomePage() {
     pages.clear();
-    pages.add(
-      MyRoute(
-        key: ValueKey('HomePage'),
-        builder: (context) => MyHomePage(
-          onSearchPageClick: pushSearchPage,
-          onMangaClick: pushMangaPage,
-          pushDirectToManga: pushDirectlyToManga,
-          pushDirectToReader: pushDirectlyToChapter,
-          pushToLost: pushLostPage,
-        ),
-      ),
-    );
     notifyListeners();
   }
 
@@ -369,10 +356,12 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
   }
 
   void pushDirectlyToManga(String mangaId) {
+    pages.clear();
     pushMangaPage(mangaId);
   }
 
   void pushDirectlyToChapter(String mangaId, int index, int pgNum) {
+    pages.clear();
     pages.add(
       MyRoute(
         builder: (context) => MangaPageWidget(
@@ -389,7 +378,10 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
   Widget build(BuildContext context) {
     return Navigator(
       key: navigatorKey,
-      pages: List.unmodifiable(pages),
+      pages: List.unmodifiable([
+        homePage,
+        for(Page p in pages) p,
+      ]),
       onPopPage: (route, result) {
         if (!route.didPop(result)) {
           return false;
@@ -432,6 +424,7 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
           pushDirectlyToChapter(configuration.mangaId, configuration.index, null);
         }
         break;
+      case RouteType.LOST_ROUTE:
       default:
         pushLostPage();
     }
@@ -454,8 +447,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static bool _handledFirstLink = false;
-
   int _selectionIndex = 0;
 
   List<Widget> _actualNavs;
@@ -465,9 +456,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _handleInitUri();
-    _handleSub();
-    setupInteractedMessage();
+    setupFCM();
     _actualNavs = <Widget>[
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -486,29 +475,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _streamSubscription.cancel();
   }
 
-  void _handleInitUri() async {
-    if (!_handledFirstLink) {
-      _handledFirstLink = true;
-      try {
-        parseUri(await getInitialUri());
-      } on PlatformException {
-        print('failed to get initial uri');
-      } on FormatException {
-        print('malformed initial uri');
-        if (!mounted) {
-          return;
-        }
-      }
-    }
-  }
-
-  void _handleSub() {
-    if (!kIsWeb) {
-      _streamSubscription = uriLinkStream.listen(parseUri);
-    }
-  }
-
-  Future<void> setupInteractedMessage() async {
+  Future<void> setupFCM() async {
     RemoteMessage initialMessage = await FirebaseMessaging.instance.getInitialMessage();
 
     if (initialMessage != null) {
@@ -517,16 +484,22 @@ class _MyHomePageState extends State<MyHomePage> {
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
   }
 
-  void _handleMessage(RemoteMessage message) {
+  Future<void> _handleMessage(RemoteMessage message) {
+    //TODO some error here.. does not work when app is terminated
     if (message.data.containsKey('uri')) {
-      parseUri(message.data['uri']);
+      tryParseUriHard(Uri.parse(message.data['uri']));
     }
+    return SynchronousFuture(null);
   }
 
-  void parseUri(Uri uri) {
+  void tryParseUriHard(Uri uri){
     if (!mounted) {
-      return;
+      Future.doWhile(() => !mounted);
     }
+    _parseUri(uri);
+  }
+
+  void _parseUri(Uri uri) {
     if (uri != null) {
       if (uri.pathSegments.length == 2 && uri.pathSegments[0] == 'direct') {
         Map<String, String> args = uri.queryParameters;
@@ -940,68 +913,65 @@ class MangaPageWidget extends StatefulWidget {
 
 class _MangaPageWidgetState extends State<MangaPageWidget> {
   ScrollController _sc = new ScrollController();
-  CompleteManga _mn;
-  bool _err = false;
+  Future<CompleteManga> _mn;
   bool _scrolled = false;
 
   @override
   void initState() {
     super.initState();
-    APIer.fetchManga(this.widget.mangaId).then((value) => setState(() => _mn = value));
+    _mn = APIer.fetchManga(this.widget.mangaId);
   }
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      if (_sc.hasClients && !_scrolled) {
-        _sc.jumpTo(min(MediaQuery.of(context).size.height / 2, _sc.position.maxScrollExtent));
-        _scrolled = true;
-      }
-    });
-    if (_err) {
-      return Scaffold(
-          backgroundColor: Colors.black,
-          body: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                title: Text("Error"),
-              )
-            ],
-          ));
-    } else if (_mn == null) {
-      return SizedBox(width: 30, height: 30, child: CenteredFixedCircle());
-    } else {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: NestedScrollView(
-          controller: _sc,
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverAppBar(
-                title: Text(_mn.title),
-                expandedHeight: MediaQuery.of(context).size.height,
-                pinned: true,
-                flexibleSpace: FlexibleSpaceBar(
-                  titlePadding: EdgeInsets.all(16.0),
-                  //TODO think about this because title text also becomes invisible
-                  background: Container(
-                    color: Colors.black,
-                    child: CachedNetworkImage(
-                      imageUrl: _mn.coverURL,
-                      fit: BoxFit.contain,
+    return FutureBuilder(
+      future: _mn,
+      builder: (context, snapshot) {
+        CompleteManga com = snapshot.data;
+        if (snapshot.hasData) {
+          WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+            if (_sc.hasClients && !_scrolled) {
+              _sc.jumpTo(min(MediaQuery.of(context).size.height / 2, _sc.position.maxScrollExtent));
+              _scrolled = true;
+            }
+          });
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: NestedScrollView(
+              controller: _sc,
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
+                  SliverAppBar(
+                    title: Text(com.title),
+                    expandedHeight: MediaQuery.of(context).size.height,
+                    pinned: true,
+                    flexibleSpace: FlexibleSpaceBar(
+                      titlePadding: EdgeInsets.all(16.0),
+                      //TODO think about this because title text also becomes invisible
+                      background: Container(
+                        color: Colors.black,
+                        child: CachedNetworkImage(
+                          imageUrl: com.coverURL,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ];
+              },
+              body: MangaPage(
+                manga: com,
+                onClickChapter: widget.onChapterClicked,
               ),
-            ];
-          },
-          body: MangaPage(
-            manga: _mn,
-            onClickChapter: widget.onChapterClicked,
-          ),
-        ),
-      );
-    }
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return LostPage();
+        } else {
+          return CenteredFixedCircle();
+        }
+      },
+    );
   }
 }
 
@@ -1141,7 +1111,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
       _currentChapterId = _current.chaps[chapIndex].id;
       DBer.readChapter(_current.mangaId, _currentChapterId, nIn);
     }
-    if(nIn != _currIndex) {
+    if (nIn != _currIndex) {
       _currIndex = nIn;
       DBer.updateChapterPage(_currentChapterId, nIn);
       this.widget.onPageTurned.call(nCurr);

@@ -636,10 +636,10 @@ class _MangaPageState extends State<MangaPage> {
                     isFavourite: _isSaved == null ? DBer.isSaved(widget.manga.id) : Future.value(_isSaved),
                     onToggleFavourite: (b) {
                       if (!b) {
-                        FirebaseMessaging.instance.subscribeToTopic(widget.manga.id);
+                        FirebaseMessaging.instance.subscribeToTopic(widget.manga.linkedId);
                         DBer.saveManga(widget.manga.id, widget.manga.title, widget.manga.coverURL, widget.manga.description, MangaPage.genresToString(widget.manga.genres)).then((value) => setState(() => _isSaved = true));
                       } else {
-                        FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.id);
+                        FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.linkedId);
                         DBer.removeManga(widget.manga.id).then((value) => setState(() => _isSaved = false));
                       }
                     },
