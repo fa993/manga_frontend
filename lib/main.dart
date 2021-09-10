@@ -380,7 +380,7 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
       key: navigatorKey,
       pages: List.unmodifiable([
         homePage,
-        for(Page p in pages) p,
+        for (Page p in pages) p,
       ]),
       onPopPage: (route, result) {
         if (!route.didPop(result)) {
@@ -460,6 +460,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _actualNavs = <Widget>[
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
+        onMangaClicked: this.widget.onMangaClick,
       ),
       new FavouritesPageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -492,7 +493,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return SynchronousFuture(null);
   }
 
-  void tryParseUriHard(Uri uri){
+  void tryParseUriHard(Uri uri) {
     if (!mounted) {
       Future.doWhile(() => !mounted);
     }
@@ -546,22 +547,60 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
+  final Function(String) onMangaClicked;
 
-  const HomePageWidget({Key key, this.onSearchClicked}) : super(key: key);
+  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked}) : super(key: key);
 
   @override
   _HomePageWidgetState createState() => _HomePageWidgetState();
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
+  Map<int, MangaHeading> _mnc = {};
+  MangaQuery _query = MangaQuery();
+  bool _loading = false;
+  bool _finished = false;
+
+  ScrollController _sc;
+
   @override
   void initState() {
     super.initState();
+    _sc = ScrollController();
+    fetchManga(0, 20);
+  }
+
+  void fetchManga(int offset, [int length = 10]) async {
+    if (_loading) {
+      return;
+    }
+    _loading = true;
+    _query.offset = offset;
+    _query.limit = length;
+    _query.renew();
+    MangaQueryResponse res = await APIer.fetchHome(_query);
+    int i = 0;
+    if(res.headings.length < length){
+      _finished = true;
+    }
+    while (i < res.headings.length) {
+      _mnc[offset++] = res.headings[i++];
+    }
+    _loading = false;
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
+      if(_sc.hasClients && _sc.position.atEdge){
+        fetchManga(_mnc.length);
+      }
+    });
     return CustomScrollView(
+      controller: _sc,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -574,10 +613,38 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               icon: Icon(Icons.search),
               onPressed: () {
                 this.widget.onSearchClicked.call(false);
-                // Navigator.pushNamed(context, '/search', arguments: false);
               },
             ),
           ],
+        ),
+        SliverPadding(
+          padding: EdgeInsets.only(top: 16.0),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (BuildContext context, int index) {
+                if (index == _mnc.length) {
+                  fetchManga(_mnc.length);
+                  return CenteredFixedCircle();
+                }
+                return InkWell(
+                  child: MangaCover(
+                    name: _mnc[index].name,
+                    coverURL: _mnc[index].coverURL,
+                  ),
+                  onTap: () {
+                    this.widget.onMangaClicked.call(_mnc[index].id);
+                    // Navigator.pushNamed(context, '/manga', arguments: APIer.fetchManga(e.id));
+                  },
+                );
+              },
+              childCount: _finished ? _mnc.length : _mnc.length + 1,
+            ),
+          ),
         ),
       ],
     );

@@ -290,7 +290,6 @@ class MangaPageButtonPanel extends StatelessWidget {
 }
 
 class MangaPageChapterPanel extends StatefulWidget {
-
   static String chapterToDisplayString(ChapterData dat) {
     if (dat != null) {
       return dat.chapterNumber == null || dat.chapterNumber.isEmpty ? dat.chapterName : dat.chapterNumber;
@@ -881,11 +880,10 @@ class SideWheel extends CustomPainter {
 }
 
 class FavouriteManga extends StatelessWidget {
-  final Function onClick;
   final String name;
   final String coverURL;
 
-  const FavouriteManga({Key key, this.name, this.coverURL, this.onClick}) : super(key: key);
+  const FavouriteManga({Key key, this.name, this.coverURL}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -898,6 +896,7 @@ class FavouriteManga extends StatelessWidget {
           CachedNetworkImage(
             imageUrl: this.coverURL,
             height: Widgeter.favouriteImgHeight,
+            fadeInDuration: const Duration(),
             width: Widgeter.favouriteImgWidth,
             fit: BoxFit.contain,
           ),
@@ -912,6 +911,39 @@ class FavouriteManga extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class MangaCover extends StatelessWidget {
+  final String name;
+  final String coverURL;
+
+  const MangaCover({Key key, this.name, this.coverURL}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: CachedNetworkImage(
+            imageUrl: this.coverURL,
+            fit: BoxFit.contain,
+            fadeInDuration: const Duration(),
+          ),
+        ),
+        Text(
+          name,
+          softWrap: true,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

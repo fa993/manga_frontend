@@ -28,23 +28,6 @@ class APIer {
     return jsonDecode(response).cast<Map<String, dynamic>>().map<MangaHeading>((value) => SavedManga.fromJSON(value)).toList();
   }
 
-  static Future<List<MangaHeading>> fetchHome(int offset, [int limit = 10]) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/home?limit=" + limit.toString() + "&offset=" + offset.toString()));
-    if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status Code: " + response.statusCode.toString());
-    }
-    return jsonDecode(response.body).cast<Map<String, dynamic>>().map<MangaHeading>((value) => MangaHeading.fromJSON(value)).toList();
-  }
-
-  static Future<MangaHeading> fetchTest() async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/thumbnail"));
-    if (response.statusCode == HttpStatus.ok) {
-      return MangaHeading.fromJSON(jsonDecode(response.body));
-    } else {
-      throw new Exception("Failed Status Code: " + response.statusCode.toString());
-    }
-  }
-
   static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async {
     final response = await _cli.post(Uri.parse(_serverURL + _serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
     if (response.statusCode != HttpStatus.ok) {
@@ -104,6 +87,15 @@ class APIer {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
       return ChapterPosition.fromJSON(jsonDecode(response.body));
+    }
+  }
+
+  static Future<MangaQueryResponse> fetchHome(MangaQuery q) async {
+    final response = await _cli.post(Uri.parse(_serverURL + _serverMapping + "/home/"), headers: {"Content-type": "application/json"}, body: jsonEncode(q));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception("Failed Status code: " + response.statusCode.toString());
+    } else {
+      return MangaQueryResponse.fromJSON(jsonDecode(response.body));
     }
   }
 }
@@ -487,7 +479,7 @@ class MangaQuery {
   int limit;
 
   MangaQuery() {
-    this.id = _uuid.v1();
+    this.id = _generateID();
   }
 
   MangaQuery.all({this.id, this.name, this.limit, this.offset});
@@ -500,7 +492,7 @@ class MangaQuery {
   }
 
   static String _generateID() {
-    return uuid.Uuid().v1();
+    return _uuid.v1();
   }
 
   factory MangaQuery.fromJSON(Map<String, dynamic> json) {
