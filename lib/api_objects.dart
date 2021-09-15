@@ -52,6 +52,16 @@ class APIer {
     }
   }
 
+  static Future<LinkedManga> fetchPartManga(String id) async {
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/part/" + id));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception("Failed Status code: " + response.statusCode.toString());
+    } else {
+      // return compute(doParseManga, response.body);
+      return LinkedManga.fromJSON(jsonDecode(response.body));
+    }
+  }
+
   static CompleteManga doParseManga(String response) {
     return CompleteManga.fromJSON(jsonDecode(response));
   }
@@ -96,6 +106,15 @@ class APIer {
       throw new Exception("Failed Status code: " + response.statusCode.toString());
     } else {
       return MangaQueryResponse.fromJSON(jsonDecode(response.body));
+    }
+  }
+
+  static Future<List<Genre>> fetchGenres() async {
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/genres/"));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception("Failed Status code: " + response.statusCode.toString());
+    } else {
+      return (jsonDecode(response.body) as List).map((e) => Genre.fromJSON(e)).toList();
     }
   }
 }
@@ -333,23 +352,49 @@ class DBer {
 }
 
 class Memory {
+  static int _maxMemoryCap = 40;
 
   static Map<String, Chapters> _manga = {};
 
+  static List<String> _sequence = [];
+
   static String _message;
 
-  static void retain(Chapters mg) {
-    _manga[mg.mangaId] = mg;
+  static void retain(CompleteManga mg) {
+    if(!_manga.containsKey(mg.id)) {
+      _manga[mg.id] = Chapters.all(mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+      _sequence.add(mg.id);
+      if (_sequence.length > _maxMemoryCap) {
+        _manga.remove(_sequence.removeAt(0));
+      }
+    }
+    mg.linkedMangas.forEach((element) {
+      retainLinked(element);
+    });
   }
 
-  static Chapters remember(String mangaId, int index){
+  static void retainLinked(LinkedManga mg) {
+    if (!_manga.containsKey(mg.id)) {
+      _manga[mg.id] = Chapters.all(mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+      _sequence.add(mg.id);
+      if (_sequence.length > _maxMemoryCap) {
+        _manga.remove(_sequence.removeAt(0));
+      }
+    }
+  }
+
+  static Chapters remember(String mangaId, int index) {
     Chapters mg = _manga[mangaId];
-    return Chapters.all(
-      s: mg.s,
-      currentIndex: index,
-      mangaId: mangaId,
-      chaps: mg.chaps,
-    );
+    if (mg != null) {
+      return Chapters.all(
+        s: mg.s,
+        currentIndex: index,
+        mangaId: mangaId,
+        chaps: mg.chaps,
+      );
+    } else {
+      return null;
+    }
   }
 
   static void rememberQuick(String message) {
@@ -359,7 +404,6 @@ class Memory {
   static String retainQuick() {
     return _message;
   }
-
 }
 
 class MangaPreference {
@@ -385,12 +429,11 @@ class ReadChapter {
   ReadChapter.all({this.chapterId, this.timestamp, this.mangaId, this.pageNumber});
 
   Map<String, dynamic> toMap() {
-
     return {
-      if(mangaId != null) 'manga_id': mangaId,
-      if(chapterId!= null) 'chapter_id': chapterId,
-      if(timestamp != null) 'chapter_read_time': timestamp,
-      if(pageNumber != null) 'chapter_page': pageNumber,
+      if (mangaId != null) 'manga_id': mangaId,
+      if (chapterId != null) 'chapter_id': chapterId,
+      if (timestamp != null) 'chapter_read_time': timestamp,
+      if (pageNumber != null) 'chapter_page': pageNumber,
     };
   }
 }
@@ -477,18 +520,21 @@ class MangaQuery {
   String name;
   int offset;
   int limit;
+  List<String> genres;
 
   MangaQuery() {
     this.id = _generateID();
+    this.genres = [];
   }
 
-  MangaQuery.all({this.id, this.name, this.limit, this.offset});
+  MangaQuery.all({this.id, this.name, this.limit, this.offset, this.genres});
 
   MangaQuery.copy(MangaQuery query) {
     this.id = _generateID();
     this.name = query.name;
     this.limit = query.limit;
     this.offset = query.offset;
+    this.genres = query.genres;
   }
 
   static String _generateID() {
@@ -501,6 +547,7 @@ class MangaQuery {
       name: json['name'],
       limit: json['limit'],
       offset: json['offset'],
+      genres: (json['genreIds'] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -510,6 +557,7 @@ class MangaQuery {
       'name': name,
       'limit': limit,
       'offset': offset,
+      'genreIds' : genres,
     };
   }
 
@@ -538,7 +586,7 @@ class MangaQueryResponse {
   factory MangaQueryResponse.fromJSON(Map<String, dynamic> json) {
     return MangaQueryResponse.all(
       query: MangaQuery.fromJSON(json['query']),
-      headings: (json['manga'] as List).map((e) => MangaHeading.fromJSON(e)).toList(),
+      headings: (json['headings'] as List).map((e) => MangaHeading.fromJSON(e)).toList(),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
 import 'package:intl/intl.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -159,15 +160,7 @@ class MangaRoutePath {
     );
   }
 
-  factory MangaRoutePath.reader(String mangaId, int id) {
-    return new MangaRoutePath(
-      routeType: RouteType.READER_ROUTE,
-      mangaId: mangaId,
-      index: id,
-    );
-  }
-
-  factory MangaRoutePath.readerPrecise(String mangaId, int id, int pgNum) {
+  factory MangaRoutePath.reader(String mangaId, int id, int pgNum) {
     return new MangaRoutePath(
       routeType: RouteType.READER_ROUTE,
       mangaId: mangaId,
@@ -176,15 +169,7 @@ class MangaRoutePath {
     );
   }
 
-  factory MangaRoutePath.readerDirect(String mangaId, int id) {
-    return new MangaRoutePath(
-      routeType: RouteType.READER_DIRECT_ROUTE,
-      mangaId: mangaId,
-      index: id,
-    );
-  }
-
-  factory MangaRoutePath.readerPreciseDirect(String mangaId, int id, int pgNum) {
+  factory MangaRoutePath.readerDirect(String mangaId, int id, int pgNum) {
     return new MangaRoutePath(
       routeType: RouteType.READER_DIRECT_ROUTE,
       mangaId: mangaId,
@@ -212,18 +197,11 @@ class MangaRouteInformationParser extends RouteInformationParser<MangaRoutePath>
         break;
       case 1:
         if (uri.pathSegments[0] == "search") {
-          if (args.containsKey('includeDB') && args['includeDB'] as bool) {
-            ret = MangaRoutePath.search(true);
-          }
-          ret = MangaRoutePath.search(false);
+          ret = MangaRoutePath.search(bool.fromEnvironment(args['includeDB']));
         } else if (uri.pathSegments[0] == "manga" && args.containsKey('mangaId')) {
           ret = MangaRoutePath.manga(args['mangaId']);
         } else if (uri.pathSegments[0] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
-          if (args.containsKey('page')) {
-            ret = MangaRoutePath.readerPrecise(args['mangaId'], args['index'] as int, args['page'] as int);
-          } else {
-            ret = MangaRoutePath.reader(args['mangaId'], args['index'] as int);
-          }
+          ret = MangaRoutePath.reader(args['mangaId'], _toInt(args['index']), _toInt(args['page']));
         }
         break;
       case 2:
@@ -231,16 +209,16 @@ class MangaRouteInformationParser extends RouteInformationParser<MangaRoutePath>
           if (uri.pathSegments[1] == "manga" && args.containsKey('mangaId')) {
             ret = MangaRoutePath.mangaDirect(args['mangaId']);
           } else if (uri.pathSegments[1] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
-            if (args.containsKey('page')) {
-              ret = MangaRoutePath.readerPreciseDirect(args['mangaId'], args['index'] as int, args['page'] as int);
-            } else {
-              ret = MangaRoutePath.readerDirect(args['mangaId'], args['index'] as int);
-            }
+            ret = MangaRoutePath.readerDirect(args['mangaId'], _toInt(args['index']), _toInt(args['page']));
           }
         }
         break;
     }
     return SynchronousFuture(ret);
+  }
+
+  int _toInt(String s) {
+    return s != null ? int.tryParse(s) : null;
   }
 
   @override
@@ -406,23 +384,13 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath> with ChangeNotif
         pushMangaPage(configuration.mangaId);
         break;
       case RouteType.READER_ROUTE:
-        int pg = configuration.pgNum;
-        if (pg != null) {
-          pushReaderPage(configuration.mangaId, configuration.index, pg);
-        } else {
-          pushReaderPage(configuration.mangaId, configuration.index, null);
-        }
+        pushReaderPage(configuration.mangaId, configuration.index, configuration.pgNum);
         break;
       case RouteType.MANGA_PAGE_DIRECT_ROUTE:
         pushDirectlyToManga(configuration.mangaId);
         break;
       case RouteType.READER_DIRECT_ROUTE:
-        int pg = configuration.pgNum;
-        if (pg != null) {
-          pushDirectlyToChapter(configuration.mangaId, configuration.index, pg);
-        } else {
-          pushDirectlyToChapter(configuration.mangaId, configuration.index, null);
-        }
+        pushDirectlyToChapter(configuration.mangaId, configuration.index, configuration.pgNum);
         break;
       case RouteType.LOST_ROUTE:
       default:
@@ -453,10 +421,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   StreamSubscription _streamSubscription;
 
+  String _homeLabel = "Home";
+
   @override
   void initState() {
     super.initState();
-    setupFCM();
+    _setupFCM();
     _actualNavs = <Widget>[
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -473,13 +443,15 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     super.dispose();
-    _streamSubscription.cancel();
+    _streamSubscription?.cancel();
   }
 
-  Future<void> setupFCM() async {
+  Future<void> _setupFCM() async {
     RemoteMessage initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-
     if (initialMessage != null) {
+      setState(() {
+        _homeLabel = "1";
+      });
       _handleMessage(initialMessage);
     }
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
@@ -488,6 +460,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _handleMessage(RemoteMessage message) {
     //TODO some error here.. does not work when app is terminated
     if (message.data.containsKey('uri')) {
+      setState(() {
+        _homeLabel += "2";
+      });
       tryParseUriHard(Uri.parse(message.data['uri']));
     }
     return SynchronousFuture(null);
@@ -501,6 +476,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _parseUri(Uri uri) {
+    setState(() {
+      _homeLabel += "3";
+    });
     if (uri != null) {
       if (uri.pathSegments.length == 2 && uri.pathSegments[0] == 'direct') {
         Map<String, String> args = uri.queryParameters;
@@ -508,16 +486,16 @@ class _MyHomePageState extends State<MyHomePage> {
           this.widget.pushDirectToManga.call(args['mangaId']);
           return;
         } else if (uri.pathSegments[1] == "read" && args.containsKey('mangaId') && args.containsKey('index')) {
-          int pgNum;
-          if (args.containsKey('page')) {
-            pgNum = args['page'] as int;
-          }
-          this.widget.pushDirectToReader.call(args['mangaId'], args['index'] as int, pgNum);
+          this.widget.pushDirectToReader.call(args['mangaId'], _toInt(args['index']), _toInt(args['page']));
           return;
         }
       }
       this.widget.pushToLost.call();
     }
+  }
+
+  int _toInt(String s) {
+    return s != null ? int.tryParse(s) : null;
   }
 
   @override
@@ -560,14 +538,120 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   MangaQuery _query = MangaQuery();
   bool _loading = false;
   bool _finished = false;
+  List<Genre> _genres = [];
 
-  ScrollController _sc;
+  OverlayEntry _genreEntry;
+  LayerLink _link;
+
+  ScrollController _scGrid;
 
   @override
   void initState() {
     super.initState();
-    _sc = ScrollController();
-    fetchManga(0, 20);
+    _scGrid = ScrollController();
+    _link = LayerLink();
+    _scGrid.addListener(() {
+      if (_scGrid.offset >= _scGrid.position.maxScrollExtent && !_scGrid.position.outOfRange) {
+        fetchManga(_mnc.length);
+      }
+    });
+    fetchBegin();
+    fetchGenres();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  void _onClickGenre(BuildContext context) {
+    if (_genreEntry == null) {
+      _genreEntry = OverlayEntry(
+        builder: (context) {
+          return Positioned(
+            child: CompositedTransformFollower(
+              link: _link,
+              offset: Offset(0, 20),
+              showWhenUnlinked: false,
+              followerAnchor: Alignment.topCenter,
+              targetAnchor: Alignment.bottomCenter,
+              child: Material(
+                color: Colors.yellow,
+                child: _genres.length == 0
+                    ? Text("Loading")
+                    : ListView.separated(
+                        padding: EdgeInsets.all(0.0),
+                        itemBuilder: (context, index) => ListTile(
+                          title: Text(index == 0 ? "Clear" : _genres[index - 1].name),
+                          onTap: () {
+                            if (index == 0) {
+                              _query.genres.clear();
+                            } else {
+                              _query.genres.contains(_genres[index - 1].id) ? _query.genres.remove(_genres[index - 1].id) : _query.genres.add(_genres[index - 1].id);
+                            }
+                            fetchBegin(true);
+                            _genreEntry.markNeedsBuild();
+                          },
+                          selected: index == 0 ? false : _query.genres.contains(_genres[index - 1].id),
+                          tileColor: Colors.yellow,
+                          selectedTileColor: Colors.green,
+                        ),
+                        separatorBuilder: (context, index) => const Divider(),
+                        itemCount: _genres.length + 1,
+                      ),
+              ),
+            ),
+          );
+        },
+      );
+      Overlay.of(context).insert(_genreEntry);
+    } else {
+      _genreEntry.remove();
+      // _genreEntry.dispose(); TODO figure out if this is safe
+      _genreEntry = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    if (_genreEntry != null) {
+      _genreEntry
+        ..remove()
+        ..dispose();
+      _genreEntry = null;
+    }
+  }
+
+  void fetchBegin([bool entry = false]) async {
+    _finished = false;
+    List<MangaHeading> hd = await doFetchManga(0, 20);
+    int i = -1;
+    if (_scGrid.hasClients) {
+      _scGrid.jumpTo(0);
+    }
+    if (mounted) {
+      setState(() {
+        _mnc.clear();
+        while (++i < hd.length) {
+          _mnc[i] = hd[i];
+        }
+      });
+    }
+    if (entry) {
+      _genreEntry?.markNeedsBuild();
+    }
+  }
+
+  Future<List<MangaHeading>> doFetchManga(int offset, [int length]) async {
+    _query.offset = offset;
+    _query.limit = length;
+    _query.renew();
+    MangaQueryResponse res = await APIer.fetchHome(_query);
+    if (res.headings.length < length) {
+      _finished = true;
+    }
+    return res.headings;
   }
 
   void fetchManga(int offset, [int length = 10]) async {
@@ -575,32 +659,31 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       return;
     }
     _loading = true;
-    _query.offset = offset;
-    _query.limit = length;
-    _query.renew();
-    MangaQueryResponse res = await APIer.fetchHome(_query);
-    int i = 0;
-    if(res.headings.length < length){
-      _finished = true;
-    }
-    while (i < res.headings.length) {
-      _mnc[offset++] = res.headings[i++];
+    List<MangaHeading> hd = await doFetchManga(offset, length);
+    if (mounted) {
+      setState(() {
+        int i = 0;
+        while (i < hd.length) {
+          _mnc[offset++] = hd[i++];
+        }
+      });
     }
     _loading = false;
+  }
+
+  void fetchGenres() async {
+    List<Genre> gen = await APIer.fetchGenres();
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _genres = gen;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
-      if(_sc.hasClients && _sc.position.atEdge){
-        fetchManga(_mnc.length);
-      }
-    });
     return CustomScrollView(
-      controller: _sc,
+      controller: _scGrid,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -609,6 +692,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           snap: false,
           pinned: true,
           actions: [
+            CompositedTransformTarget(
+              link: _link,
+              child: IconButton(
+                icon: Icon(Icons.filter_alt_outlined),
+                onPressed: () => _onClickGenre(context),
+              ),
+            ),
             IconButton(
               icon: Icon(Icons.search),
               onPressed: () {
@@ -622,8 +712,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
             ),
             delegate: SliverChildBuilderDelegate(
               (BuildContext context, int index) {
@@ -663,6 +753,7 @@ class FavouritesPageWidget extends StatefulWidget {
 
 class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
   final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
+  double boxSide;
 
   @override
   void initState() {
@@ -671,6 +762,12 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
     DBer.initializeDatabase().then((value) {
       _notifier.value += 1;
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    boxSide = (MediaQuery.of(this.context).size.width - 4 * 16) / 3;
   }
 
   void _move<T>(int from, int to, List<T> items) {
@@ -687,6 +784,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
             child: FavouriteManga(
               name: e.name,
               coverURL: e.coverURL,
+              side: boxSide,
             ),
             onTap: () {
               this.widget.onMangaClicked.call(e.id);
@@ -715,8 +813,9 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         ],
       ),
       backgroundColor: Colors.black,
-      body: SingleChildScrollView(
-        child: Center(
+      body: Align(
+        alignment: Alignment.topLeft,
+        child: SingleChildScrollView(
           child: Container(
             padding: EdgeInsets.all(16.0),
             child: ValueListenableBuilder<int>(
@@ -733,6 +832,9 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
                         needsLongPressDraggable: false,
                         spacing: 16.0,
                         children: renderedManga,
+                        maxMainAxisCount: 3,
+                        minMainAxisCount: 3,
+                        runSpacing: 16.0,
                         onReorder: (from, to) {
                           String id1 = savedManga[from].id;
                           String id2 = savedManga[to].id;
@@ -880,12 +982,12 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
-      if (_sc.position.maxScrollExtent == 0 && _mangaQuery.name != null && _mangaQuery.name.isNotEmpty && !_finished) {
-        print('Through callback');
-        fetchMore();
-      }
-    });
+    // WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
+    //   if (_sc.position.atEdge && _mangaQuery.name != null && _mangaQuery.name.isNotEmpty && !_finished) {
+    //     print('Through callback');
+    //     fetchMore();
+    //   }
+    // });
     return Scaffold(
         backgroundColor: Colors.black,
         body: NotificationListener<ScrollStartNotification>(
@@ -1121,6 +1223,11 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   }
 
   void setup() async {
+    if (_current == null) {
+      LinkedManga part = await APIer.fetchPartManga(this.widget.mangaId);
+      _current = Chapters.all(mangaId: part.id, chaps: part.chapters, s: part.source, currentIndex: this.widget.index);
+      Memory.retainLinked(part);
+    }
     ChapterPosition position = await APIer.fetchChapterPageNumber(_current.mangaId, _current.chaps[_current.currentIndex].sequenceNumber);
     int displayMode = await DBer.getPreferredScrollStyle(_current.mangaId);
     if (displayMode != null) {
@@ -1401,6 +1508,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
           link: _link,
           followerAnchor: Alignment.topRight,
           targetAnchor: Alignment.bottomRight,
+          showWhenUnlinked: false,
           offset: Offset(0, 20),
           child: ReaderPageSettingsPanel(
             onLeftToRight: () {

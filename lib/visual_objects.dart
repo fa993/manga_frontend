@@ -600,7 +600,7 @@ class _MangaPageState extends State<MangaPage> {
   void initState() {
     super.initState();
     DBer.registerNotifierForChapter(_notifier);
-    Memory.retain(Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: -1, s: widget.manga.source));
+    Memory.retain(this.widget.manga);
   }
 
   @override
@@ -614,7 +614,7 @@ class _MangaPageState extends State<MangaPage> {
         itemBuilder: (context, index) {
           if (index > 3) {
             return MangaPageChapterPanel(
-              mangaId: widget.manga.id,
+              mangaId: widget.manga.linkedMangas[index - 3 - 1].id,
               s: widget.manga.linkedMangas[index - 3 - 1].source,
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
               expandedIndex: index,
@@ -882,23 +882,30 @@ class SideWheel extends CustomPainter {
 class FavouriteManga extends StatelessWidget {
   final String name;
   final String coverURL;
+  final double side;
 
-  const FavouriteManga({Key key, this.name, this.coverURL}) : super(key: key);
+  const FavouriteManga({Key key, this.name, this.coverURL, this.side}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: Widgeter.favouriteImgWidth,
+      width: this.side,
+      color: Colors.black,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CachedNetworkImage(
-            imageUrl: this.coverURL,
-            height: Widgeter.favouriteImgHeight,
-            fadeInDuration: const Duration(),
-            width: Widgeter.favouriteImgWidth,
-            fit: BoxFit.contain,
+          Container(
+            child: CachedNetworkImage(
+              imageUrl: this.coverURL,
+              fadeInDuration: const Duration(),
+              fit: BoxFit.contain,
+            ),
+            width: this.side,
+            height: this.side,
+          ),
+          SizedBox(
+            height: 5,
           ),
           Text(
             name,
@@ -927,12 +934,16 @@ class MangaCover extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(
+        Flexible(
           child: CachedNetworkImage(
             imageUrl: this.coverURL,
             fit: BoxFit.contain,
             fadeInDuration: const Duration(),
           ),
+          fit: FlexFit.loose,
+        ),
+        SizedBox(
+          height: 5,
         ),
         Text(
           name,
