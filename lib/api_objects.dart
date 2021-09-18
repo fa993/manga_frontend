@@ -52,6 +52,10 @@ class APIer {
     }
   }
 
+  static CompleteManga doParseManga(String response) {
+    return CompleteManga.fromJSON(jsonDecode(response));
+  }
+
   static Future<LinkedManga> fetchPartManga(String id) async {
     final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/part/" + id));
     if (response.statusCode != HttpStatus.ok) {
@@ -62,9 +66,6 @@ class APIer {
     }
   }
 
-  static CompleteManga doParseManga(String response) {
-    return CompleteManga.fromJSON(jsonDecode(response));
-  }
 
   static Future<ChapterContent> fetchChapter(String id) async {
     final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));

@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:manga_frontend/api_objects.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:transparent_image/transparent_image.dart';
 
 class Widgeter {
@@ -315,6 +316,8 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 
   static int _expandedIndex = -1;
 
+  ChapterScrollPosition _scp;
+
   void switchDisplayMode() {
     setState(() {
       if (this.widget.expandedIndex == _expandedIndex) {
@@ -329,14 +332,17 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   void initState() {
     super.initState();
     _expandedIndex = -1;
+    _scp = ChapterScrollPosition(index: 0);
+    getInitialIndex().then((value) => setState(() => _scp.index = value));
   }
 
   Function onClick(int index) {
     return (context) {
       this.widget.onClickChapter.call(this.widget.mangaId, index, null);
-      // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.mangaId, chaps: widget.chaps, currentIndex: index, s: widget.s), this.widget.pushCallback);
     };
   }
+
+  Future<int> getInitialIndex() => DBer.getMostRecentReadChapter(this.widget.mangaId).then((value) => widget.chaps.entries.firstWhere((element) => element.value.id == value, orElse: () => widget.chaps.entries.first).key, onError: (x) => 0);
 
   @override
   Widget build(BuildContext context) {
@@ -360,10 +366,12 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
             ? MangaPageCustomChapterGrid(
                 chaps: this.widget.chaps,
                 onClick: onClick,
+                position: _scp,
               )
             : MangaPageChapterList(
                 chaps: this.widget.chaps,
                 onClick: onClick,
+                position: _scp,
               ),
       ],
     );
@@ -371,16 +379,29 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 }
 
 class MangaPageChapterList extends StatelessWidget {
+
   final Function onClick;
   final Map<int, ChapterData> chaps;
+  final ChapterScrollPosition position;
+  final ItemPositionsListener _ipl;
 
-  const MangaPageChapterList({Key key, this.onClick, this.chaps}) : super(key: key);
+  MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : _ipl = init(position), super(key: key);
+
+  static ItemPositionsListener init(ChapterScrollPosition pst) {
+    ItemPositionsListener tmp = ItemPositionsListener.create();
+    tmp.itemPositions.addListener(() {
+      pst.index = tmp.itemPositions.value.first.index;
+    });
+    return tmp;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: Widgeter.mangaPageChapterButtonHeight,
-      child: ListView.separated(
+      child: ScrollablePositionedList.separated(
+        itemPositionsListener: _ipl,
+        initialScrollIndex: position.index,
         itemBuilder: (context, index) {
           return MangaPageChapterButton(
             displayName: MangaPageChapterPanel.chapterToDisplayString(chaps[index]),
@@ -399,18 +420,75 @@ class MangaPageChapterList extends StatelessWidget {
   }
 }
 
+
+// class MangaPageChapterListO extends StatefulWidget {
+//   final Function onClick;
+//   final Map<int, ChapterData> chaps;
+//   final ChapterScrollPosition position;
+//
+//   const MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : super(key: key);
+//
+//   @override
+//   _MangaPageChapterListState createState() => _MangaPageChapterListState();
+// }
+//
+// class _MangaPageChapterListState extends State<MangaPageChapterList> {
+//   ItemScrollController _isc;
+//   ItemPositionsListener _ipl;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _isc = ItemScrollController();
+//     _ipl.itemPositions.addListener(() {
+//       widget.position.index = _ipl.itemPositions.value.first.index;
+//     });
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       height: Widgeter.mangaPageChapterButtonHeight,
+//       child: ScrollablePositionedList.separated(
+//         itemScrollController: _isc,
+//         itemPositionsListener: _ipl,
+//         initialScrollIndex: widget.position.index,
+//         itemBuilder: (context, index) {
+//           return MangaPageChapterButton(
+//             displayName: MangaPageChapterPanel.chapterToDisplayString(widget.chaps[index]),
+//             onClick: widget.onClick.call(index),
+//           );
+//         },
+//         scrollDirection: Axis.horizontal,
+//         itemCount: widget.chaps.length,
+//         separatorBuilder: (context, index) {
+//           return SizedBox(
+//             width: Widgeter.mangaPageChapterGridSpacingWidth,
+//           );
+//         },
+//       ),
+//     );
+//   }
+//
+//   @override
+//   void dispose() {
+//     super.dispose();
+//   }
+// }
+
 class MangaPageCustomChapterGrid extends StatefulWidget {
   final Function(int) onClick;
   final Map<int, ChapterData> chaps;
+  final ChapterScrollPosition position;
 
-  const MangaPageCustomChapterGrid({Key key, this.chaps, this.onClick}) : super(key: key);
+  const MangaPageCustomChapterGrid({Key key, this.chaps, this.onClick, this.position}) : super(key: key);
 
   @override
   _MangaPageCustomChapterGridState createState() => _MangaPageCustomChapterGridState();
 }
 
 class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid> {
-  ScrollController _controller = ScrollController();
+  ScrollController _controller;
   int numOfChapsPerRow;
   int numOfRows;
   double leftOffsetMain;
@@ -427,6 +505,10 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     numOfChapsPerRow = n(w, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
     leftOffsetMain = (w - (numOfChapsPerRow * Widgeter.mangaPageChapterButtonWidth + (numOfChapsPerRow - 1) * Widgeter.mangaPageChapterGridSpacingWidth)) / 2;
     numOfRows = (this.widget.chaps.length / numOfChapsPerRow).ceil();
+    _controller = ScrollController(initialScrollOffset: (widget.position.index ~/ numOfChapsPerRow) * (Widgeter.mangaPageChapterButtonHeight + Widgeter.mangaPageChapterGridSpacingHeight));
+    _controller.addListener(() {
+      widget.position.index = numOfChapsPerRow * (_controller.offset / (Widgeter.mangaPageChapterButtonHeight + Widgeter.mangaPageChapterGridSpacingHeight)).ceil();
+    });
   }
 
   void figureOutWhichChapterWasClicked(BuildContext context, TapUpDetails deets) {
@@ -474,11 +556,7 @@ class _MangaPageCustomChapterGridState extends State<MangaPageCustomChapterGrid>
     );
   }
 
-  int n(double dimension, double buttonDimension, double buttonSpacing) {
-    double minus = dimension - buttonDimension;
-    int x = minus ~/ (buttonDimension + buttonSpacing);
-    return x;
-  }
+  int n(double dimension, double buttonDimension, double buttonSpacing) => (dimension - buttonDimension) ~/ (buttonDimension + buttonSpacing);
 }
 
 class MangaPageCustomChapterGridPainter extends CustomPainter {
@@ -511,7 +589,6 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     int rowsScrolled = (controller.offset / (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight)).floor();
-    // int numOfChapsPerRow = n(size.width, Widgeter.mangaPageChapterButtonWidth, Widgeter.mangaPageChapterGridSpacingWidth).floor();
     int startIndex = numOfChapsPerRow * rowsScrolled;
     int rowsThatCanBeDisplayed = n(viewportHeight, Widgeter.mangaPageChapterButtonHeight, Widgeter.mangaPageChapterGridSpacingHeight).ceil() + 1 + 1;
     double offsetAtThatRow = rowsScrolled * (Widgeter.mangaPageChapterGridSpacingHeight + Widgeter.mangaPageChapterButtonHeight);
@@ -546,11 +623,7 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
     return false;
   }
 
-  int n(double dimension, double buttonDimension, double buttonSpacing) {
-    double minus = dimension - buttonDimension;
-    int x = minus ~/ (buttonDimension + buttonSpacing);
-    return x;
-  }
+  int n(double dimension, double buttonDimension, double buttonSpacing) => (dimension - buttonDimension) ~/ (buttonDimension + buttonSpacing);
 }
 
 class MangaPageChapterButton extends StatelessWidget {
@@ -964,4 +1037,10 @@ class ChapterSlice {
   int chapterIndex;
 
   ChapterSlice.all(this.displayText, this.chapterIndex);
+}
+
+class ChapterScrollPosition {
+  int index;
+
+  ChapterScrollPosition({this.index});
 }
