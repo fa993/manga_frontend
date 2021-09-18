@@ -378,71 +378,21 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   }
 }
 
-class MangaPageChapterList extends StatelessWidget {
-
-  final Function onClick;
-  final Map<int, ChapterData> chaps;
-  final ChapterScrollPosition position;
-  final ItemPositionsListener _ipl;
-
-  MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : _ipl = init(position), super(key: key);
-
-  static ItemPositionsListener init(ChapterScrollPosition pst) {
-    ItemPositionsListener tmp = ItemPositionsListener.create();
-    tmp.itemPositions.addListener(() {
-      pst.index = tmp.itemPositions.value.first.index;
-    });
-    return tmp;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: Widgeter.mangaPageChapterButtonHeight,
-      child: ScrollablePositionedList.separated(
-        itemPositionsListener: _ipl,
-        initialScrollIndex: position.index,
-        itemBuilder: (context, index) {
-          return MangaPageChapterButton(
-            displayName: MangaPageChapterPanel.chapterToDisplayString(chaps[index]),
-            onClick: onClick.call(index),
-          );
-        },
-        scrollDirection: Axis.horizontal,
-        itemCount: chaps.length,
-        separatorBuilder: (context, index) {
-          return SizedBox(
-            width: Widgeter.mangaPageChapterGridSpacingWidth,
-          );
-        },
-      ),
-    );
-  }
-}
-
-
-// class MangaPageChapterListO extends StatefulWidget {
+// class MangaPageChapterList extends StatelessWidget {
+//
 //   final Function onClick;
 //   final Map<int, ChapterData> chaps;
 //   final ChapterScrollPosition position;
+//   final ItemPositionsListener _ipl;
 //
-//   const MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : super(key: key);
+//   MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : _ipl = init(position), super(key: key);
 //
-//   @override
-//   _MangaPageChapterListState createState() => _MangaPageChapterListState();
-// }
-//
-// class _MangaPageChapterListState extends State<MangaPageChapterList> {
-//   ItemScrollController _isc;
-//   ItemPositionsListener _ipl;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _isc = ItemScrollController();
-//     _ipl.itemPositions.addListener(() {
-//       widget.position.index = _ipl.itemPositions.value.first.index;
+//   static ItemPositionsListener init(ChapterScrollPosition pst) {
+//     ItemPositionsListener tmp = ItemPositionsListener.create();
+//     tmp.itemPositions.addListener(() {
+//       pst.index = tmp.itemPositions.value.first.index;
 //     });
+//     return tmp;
 //   }
 //
 //   @override
@@ -450,17 +400,16 @@ class MangaPageChapterList extends StatelessWidget {
 //     return Container(
 //       height: Widgeter.mangaPageChapterButtonHeight,
 //       child: ScrollablePositionedList.separated(
-//         itemScrollController: _isc,
 //         itemPositionsListener: _ipl,
-//         initialScrollIndex: widget.position.index,
+//         initialScrollIndex: position.index,
 //         itemBuilder: (context, index) {
 //           return MangaPageChapterButton(
-//             displayName: MangaPageChapterPanel.chapterToDisplayString(widget.chaps[index]),
-//             onClick: widget.onClick.call(index),
+//             displayName: MangaPageChapterPanel.chapterToDisplayString(chaps[index]),
+//             onClick: onClick.call(index),
 //           );
 //         },
 //         scrollDirection: Axis.horizontal,
-//         itemCount: widget.chaps.length,
+//         itemCount: chaps.length,
 //         separatorBuilder: (context, index) {
 //           return SizedBox(
 //             width: Widgeter.mangaPageChapterGridSpacingWidth,
@@ -469,12 +418,63 @@ class MangaPageChapterList extends StatelessWidget {
 //       ),
 //     );
 //   }
-//
-//   @override
-//   void dispose() {
-//     super.dispose();
-//   }
 // }
+
+
+class MangaPageChapterList extends StatefulWidget {
+  final Function onClick;
+  final Map<int, ChapterData> chaps;
+  final ChapterScrollPosition position;
+
+  const MangaPageChapterList({Key key, this.onClick, this.chaps, this.position}) : super(key: key);
+
+  @override
+  _MangaPageChapterListState createState() => _MangaPageChapterListState();
+}
+
+class _MangaPageChapterListState extends State<MangaPageChapterList> {
+  ItemScrollController _isc;
+  ItemPositionsListener _ipl;
+
+  @override
+  void initState() {
+    super.initState();
+    _isc = ItemScrollController();
+    _ipl.itemPositions.addListener(() {
+      widget.position.index = _ipl.itemPositions.value.first.index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: Widgeter.mangaPageChapterButtonHeight,
+      child: ScrollablePositionedList.separated(
+        itemScrollController: _isc,
+        itemPositionsListener: _ipl,
+        initialScrollIndex: widget.position.index,
+        itemBuilder: (context, index) {
+          return MangaPageChapterButton(
+            displayName: MangaPageChapterPanel.chapterToDisplayString(widget.chaps[index]),
+            onClick: widget.onClick.call(index),
+          );
+        },
+        scrollDirection: Axis.horizontal,
+        itemCount: widget.chaps.length,
+        separatorBuilder: (context, index) {
+          return SizedBox(
+            width: Widgeter.mangaPageChapterGridSpacingWidth,
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+}
 
 class MangaPageCustomChapterGrid extends StatefulWidget {
   final Function(int) onClick;
