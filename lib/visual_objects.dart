@@ -436,10 +436,14 @@ class _MangaPageChapterListState extends State<MangaPageChapterList> {
   ItemScrollController _isc;
   ItemPositionsListener _ipl;
 
+  int _lastInitialScroll;
+
   @override
   void initState() {
     super.initState();
     _isc = ItemScrollController();
+    _ipl = ItemPositionsListener.create();
+    _lastInitialScroll = widget.position.index;
     _ipl.itemPositions.addListener(() {
       widget.position.index = _ipl.itemPositions.value.first.index;
     });
@@ -447,6 +451,12 @@ class _MangaPageChapterListState extends State<MangaPageChapterList> {
 
   @override
   Widget build(BuildContext context) {
+    if(_lastInitialScroll != widget.position.index){
+      _lastInitialScroll = widget.position.index;
+      if(_isc.isAttached){
+        _isc.jumpTo(index: _lastInitialScroll);
+      }
+    }
     return Container(
       height: Widgeter.mangaPageChapterButtonHeight,
       child: ScrollablePositionedList.separated(
