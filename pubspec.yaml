@@ -1,5 +1,5 @@
 name: manga_frontend
-description: A new Flutter project.
+description: A unified reader for manga(yet).
 
 # The following line prevents the package from being accidentally published to
 # pub.dev using `pub publish`. This is preferred for private packages.
@@ -42,11 +42,16 @@ dependencies:
   reorderables: ^0.4.1
   sqflite: ^2.0.0+3
   path: ^1.8.0
+  flutter_launcher_icons: ^0.9.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  build_runner: ^2.0.3
+
+flutter_icons:
+  image_path: assets/MangaVerseLogoProfessional.png
+  android: true
+  ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -41,11 +41,15 @@ class _MyAppState extends State<MyApp> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           print(snapshot.error);
-          return CenteredFixedCircle();
+          return AppHome(
+            fcmInit: false,
+          );
         } else if (snapshot.connectionState == ConnectionState.done) {
           //TODO check if this works
           FirebaseMessaging.instance.requestPermission();
-          return AppHome();
+          return AppHome(
+            fcmInit: true,
+          );
         } else {
           return CenteredFixedCircle();
         }
@@ -70,7 +74,9 @@ class MyRoute<T> extends Page<T> {
 }
 
 class AppHome extends StatefulWidget {
-  const AppHome({Key key}) : super(key: key);
+  final bool fcmInit;
+
+  const AppHome({Key key, this.fcmInit}) : super(key: key);
 
   @override
   _AppHomeState createState() => _AppHomeState();
@@ -82,7 +88,7 @@ class _AppHomeState extends State<AppHome> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       routeInformationParser: MangaRouteInformationParser(),
-      routerDelegate: MangaRouteDelegate(),
+      routerDelegate: MangaRouteDelegate(widget.fcmInit),
       title: 'MangaVerse',
       theme: ThemeData(
         // This is the theme of your application.
@@ -290,7 +296,7 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   final List<Page> pages = [];
   Page homePage;
 
-  MangaRouteDelegate() : navigatorKey = GlobalKey<NavigatorState>() {
+  MangaRouteDelegate(bool f) : navigatorKey = GlobalKey<NavigatorState>() {
     homePage = MyRoute(
       key: ValueKey('HomePage'),
       builder: (context) => MyHomePage(
@@ -299,6 +305,7 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
         pushDirectToManga: pushDirectlyToManga,
         pushDirectToReader: pushDirectlyToChapter,
         pushToLost: pushLostPage,
+        fcmInit: f,
       ),
     );
   }
@@ -439,16 +446,18 @@ class MyHomePage extends StatefulWidget {
   final Function(String) pushDirectToManga;
   final Function(String, int, int) pushDirectToReader;
   final Function pushToLost;
+  final bool fcmInit;
 
-  const MyHomePage(
-      {Key key,
-      this.title,
-      this.onSearchPageClick,
-      this.onMangaClick,
-      this.pushDirectToManga,
-      this.pushDirectToReader,
-      this.pushToLost})
-      : super(key: key);
+  const MyHomePage({
+    Key key,
+    this.title,
+    this.onSearchPageClick,
+    this.onMangaClick,
+    this.pushDirectToManga,
+    this.pushDirectToReader,
+    this.pushToLost,
+    this.fcmInit,
+  }) : super(key: key);
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -551,7 +560,9 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.black,
         items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+              icon: Icon(widget.fcmInit ? Icons.home : Icons.home_outlined),
+              label: "Home"),
           BottomNavigationBarItem(
               icon: Icon(Icons.favorite), label: "Favorites"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
@@ -725,6 +736,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void fetchGenres() async {
     List<Genre> gen = await APIer.fetchGenres();
+    for(Genre g in gen){
+      g.name = g.name[0].toUpperCase() + g.name.substring(1).toLowerCase();
+    }
     if (mounted) {
       setState(() {
         _genres = gen;

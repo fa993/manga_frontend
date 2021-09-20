@@ -2,7 +2,7 @@
     package="com.ameya.manga_frontend">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="manga_frontend"
+        android:label="MangaVerse"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

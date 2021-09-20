@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -15,107 +16,183 @@ class APIer {
 
   static http.Client _cli = new http.Client();
 
-  static Future<List<SavedManga>> fetchFavourites() async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/favourites"));
+  static Random _rd = Random();
+
+  static Future<T> _retryExponentialBackOff<T>(Future<T> Function() func,
+          {double count = -1, int maxWaitTime = 64}) async =>
+      await Future.delayed(
+              Duration(
+                  seconds: count < 0
+                      ? 0
+                      : min(maxWaitTime, pow(2, count) + _rd.nextDouble())),
+              func)
+          .onError((error, stackTrace) => _retryExponentialBackOff(
+                func,
+                count: count + 1,
+                maxWaitTime: maxWaitTime,
+              ));
+
+  static Future<List<SavedManga>> fetchFavourites() async =>
+      _retryExponentialBackOff(_fetchFavourites);
+
+  static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async =>
+      _retryExponentialBackOff(() => _fetchSearch(mangaQuery));
+
+  static Future<CompleteManga> fetchManga(String id) async =>
+      _retryExponentialBackOff(() => _fetchManga(id));
+
+  static Future<LinkedManga> fetchPartManga(String id) async =>
+      _retryExponentialBackOff(() => _fetchPartManga(id));
+
+  static Future<ChapterContent> fetchChapter(String id) async =>
+      _retryExponentialBackOff(() => _fetchChapter(id));
+
+  static Future<ChapterPosition> fetchChapterPageNumber(
+          String mangaId, int sequenceNumber) async =>
+      _retryExponentialBackOff(
+          () => _fetchChapterPageNumber(mangaId, sequenceNumber));
+
+  static Future<MangaQueryResponse> fetchHome(MangaQuery q) async =>
+      _retryExponentialBackOff(() => _fetchHome(q));
+
+  static Future<List<Genre>> fetchGenres() async =>
+      _retryExponentialBackOff(_fetchGenres);
+
+
+  //
+
+
+  static Future<List<SavedManga>> _fetchFavourites() async {
+    final response =
+        await _cli.get(Uri.parse(_serverURL + _serverMapping + "/favourites"));
     if (response.statusCode == HttpStatus.ok) {
-      return await compute(doParseFavourites, response.body);
+      return await compute(_doParseFavourites, response.body);
     } else {
-      throw new Exception("Failed Status Code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status Code: " + response.statusCode.toString());
     }
   }
 
-  static List<SavedManga> doParseFavourites(String response) {
-    return jsonDecode(response).cast<Map<String, dynamic>>().map<MangaHeading>((value) => SavedManga.fromJSON(value)).toList();
+  static List<SavedManga> _doParseFavourites(String response) {
+    return jsonDecode(response)
+        .cast<Map<String, dynamic>>()
+        .map<MangaHeading>((value) => SavedManga.fromJSON(value))
+        .toList();
   }
 
-  static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async {
-    final response = await _cli.post(Uri.parse(_serverURL + _serverMapping + "/search/"), headers: {"Content-type": "application/json"}, body: jsonEncode(mangaQuery));
+  static Future<MangaQueryResponse> _fetchSearch(MangaQuery mangaQuery) async {
+    final response = await _cli.post(
+        Uri.parse(_serverURL + _serverMapping + "/search/"),
+        headers: {"Content-type": "application/json"},
+        body: jsonEncode(mangaQuery));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
-      // return compute(doParseSearch, response.body);
+      // return compute(_doParseSearch, response.body);
       return MangaQueryResponse.fromJSON(jsonDecode(response.body));
     }
   }
 
-  static MangaQueryResponse doParseSearch(String response) {
+  static MangaQueryResponse _doParseSearch(String response) {
     return MangaQueryResponse.fromJSON(jsonDecode(response));
   }
 
-  static Future<CompleteManga> fetchManga(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/" + id));
+  static Future<CompleteManga> _fetchManga(String id) async {
+    final response =
+        await _cli.get(Uri.parse(_serverURL + _serverMapping + "/" + id));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
-      // return compute(doParseManga, response.body);
+      // return compute(_doParseManga, response.body);
       return CompleteManga.fromJSON(jsonDecode(response.body));
     }
   }
 
-  static CompleteManga doParseManga(String response) {
+  static CompleteManga _doParseManga(String response) {
     return CompleteManga.fromJSON(jsonDecode(response));
   }
 
-  static Future<LinkedManga> fetchPartManga(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/part/" + id));
+  static Future<LinkedManga> _fetchPartManga(String id) async {
+    final response =
+        await _cli.get(Uri.parse(_serverURL + _serverMapping + "/part/" + id));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
       // return compute(doParseManga, response.body);
       return LinkedManga.fromJSON(jsonDecode(response.body));
     }
   }
 
-
-  static Future<ChapterContent> fetchChapter(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
+  static Future<ChapterContent> _fetchChapter(String id) async {
+    final response = await _cli
+        .get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
-      // return compute(doParseManga, response.body);
       return ChapterContent.fromJSON(jsonDecode(response.body));
     }
   }
 
   static Future<ChapterContent> fetchChapterOpt(String id) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
+    final response = await _cli
+        .get(Uri.parse(_serverURL + _serverMapping + "/chapter/" + id));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
       return SchedulerBinding.instance.scheduleTask(() {
-        return doParseChapter(response.body);
+        return _doParseChapter(response.body);
       }, Priority.animation);
     }
   }
 
-  static ChapterContent doParseChapter(String response) {
+  static ChapterContent _doParseChapter(String response) {
     return ChapterContent.fromJSON(jsonDecode(response));
   }
 
-  static Future<ChapterPosition> fetchChapterPageNumber(String mangaId, int sequenceNumber) async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/chapter/position/" + mangaId + "/" + sequenceNumber.toString()));
+  static Future<ChapterPosition> _fetchChapterPageNumber(
+      String mangaId, int sequenceNumber) async {
+    final response = await _cli.get(Uri.parse(_serverURL +
+        _serverMapping +
+        "/chapter/position/" +
+        mangaId +
+        "/" +
+        sequenceNumber.toString()));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
       return ChapterPosition.fromJSON(jsonDecode(response.body));
     }
   }
 
-  static Future<MangaQueryResponse> fetchHome(MangaQuery q) async {
-    final response = await _cli.post(Uri.parse(_serverURL + _serverMapping + "/home/"), headers: {"Content-type": "application/json"}, body: jsonEncode(q));
+  static Future<MangaQueryResponse> _fetchHome(MangaQuery q) async {
+    final response = await _cli.post(
+        Uri.parse(_serverURL + _serverMapping + "/home/"),
+        headers: {"Content-type": "application/json"},
+        body: jsonEncode(q));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
       return MangaQueryResponse.fromJSON(jsonDecode(response.body));
     }
   }
 
-  static Future<List<Genre>> fetchGenres() async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/genres/"));
+  static Future<List<Genre>> _fetchGenres() async {
+    final response =
+        await _cli.get(Uri.parse(_serverURL + _serverMapping + "/genres/"));
     if (response.statusCode != HttpStatus.ok) {
-      throw new Exception("Failed Status code: " + response.statusCode.toString());
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
     } else {
-      return (jsonDecode(response.body) as List).map((e) => Genre.fromJSON(e)).toList();
+      return (jsonDecode(response.body) as List)
+          .map((e) => Genre.fromJSON(e))
+          .toList();
     }
   }
 }
@@ -138,25 +215,34 @@ class DBer {
       _mangaDB = await openDatabase(
         join(await getDatabasesPath(), _databaseName),
         onCreate: (db, version) async {
-          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
-          await db.execute('CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
-          await db.execute('CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
+          await db.execute(
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
+          await db.execute(
+              'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute(
+              'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
         onUpgrade: (db, vo, vn) async {
           await db.execute('DROP TABLE IF EXISTS $_savedMangaTableName');
-          await db.execute('CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute(
+              'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE IF EXISTS $_chapterTableName');
-          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
+          await db.execute(
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
           await db.execute('DROP TABLE IF EXISTS $_mangaPreferencesTableName');
-          await db.execute('CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
+          await db.execute(
+              'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
         onDowngrade: (db, vo, vn) async {
           await db.execute('DROP TABLE IF EXISTS $_savedMangaTableName');
-          await db.execute('CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute(
+              'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE IF EXISTS $_chapterTableName');
-          await db.execute('CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
+          await db.execute(
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
           await db.execute('DROP TABLE IF EXISTS $_mangaPreferencesTableName');
-          await db.execute('CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
+          await db.execute(
+              'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
         version: 7,
       );
@@ -182,7 +268,13 @@ class DBer {
     return _mangaDB
         .query(
           _savedMangaTableName,
-          columns: ['saved_manga_id', 'name', 'coverURL', 'all_genres', 'description'],
+          columns: [
+            'saved_manga_id',
+            'name',
+            'coverURL',
+            'all_genres',
+            'description'
+          ],
           where: 'name LIKE ?',
           whereArgs: ['%${query.name}%'],
         )
@@ -210,7 +302,11 @@ class DBer {
           .then(
         (value) {
           return value.map(
-            (e) => SavedManga.all(index: e['manga_index'], id: e['saved_manga_id'], coverURL: e['coverURL'], name: e['name']),
+            (e) => SavedManga.all(
+                index: e['manga_index'],
+                id: e['saved_manga_id'],
+                coverURL: e['coverURL'],
+                name: e['name']),
           );
         },
       );
@@ -223,9 +319,11 @@ class DBer {
     return saveManga(mg.id, mg.name, mg.coverURL, mg.description, mg.allGenres);
   }
 
-  static Future<void> saveManga(String id, String name, String coverURL, String description, String allGenres) async {
+  static Future<void> saveManga(String id, String name, String coverURL,
+      String description, String allGenres) async {
     await _mangaDB.transaction((txn) async {
-      int index = Sqflite.firstIntValue(await txn.rawQuery('SELECT max(manga_index) from $_savedMangaTableName'));
+      int index = Sqflite.firstIntValue(await txn
+          .rawQuery('SELECT max(manga_index) from $_savedMangaTableName'));
       if (index != null) {
         index += 1;
       } else {
@@ -270,15 +368,27 @@ class DBer {
     //TODO
     _mangaDB.transaction((txn) async {
       //TODO test this
-      int index1 = Sqflite.firstIntValue(await txn.query(_savedMangaTableName, where: "saved_manga_id = ? ", whereArgs: [id1], columns: ['manga_index']));
-      int index2 = Sqflite.firstIntValue(await txn.query(_savedMangaTableName, where: "saved_manga_id = ? ", whereArgs: [id2], columns: ['manga_index']));
+      int index1 = Sqflite.firstIntValue(await txn.query(_savedMangaTableName,
+          where: "saved_manga_id = ? ",
+          whereArgs: [id1],
+          columns: ['manga_index']));
+      int index2 = Sqflite.firstIntValue(await txn.query(_savedMangaTableName,
+          where: "saved_manga_id = ? ",
+          whereArgs: [id2],
+          columns: ['manga_index']));
       if (index2 < index1) {
-        await txn.rawUpdate('UPDATE $_savedMangaTableName set manga_index = manga_index + 1 where manga_index >= ? AND manga_index < ?', [index2, index1]);
+        await txn.rawUpdate(
+            'UPDATE $_savedMangaTableName set manga_index = manga_index + 1 where manga_index >= ? AND manga_index < ?',
+            [index2, index1]);
       } else {
         //index2 > index1
-        await txn.rawUpdate('UPDATE $_savedMangaTableName set manga_index = manga_index - 1 where manga_index > ? AND manga_index <= ?', [index1, index2]);
+        await txn.rawUpdate(
+            'UPDATE $_savedMangaTableName set manga_index = manga_index - 1 where manga_index > ? AND manga_index <= ?',
+            [index1, index2]);
       }
-      await txn.rawUpdate('UPDATE $_savedMangaTableName set manga_index = ? where saved_manga_id = ?', [index2, id1]);
+      await txn.rawUpdate(
+          'UPDATE $_savedMangaTableName set manga_index = ? where saved_manga_id = ?',
+          [index2, id1]);
     });
   }
 
@@ -362,8 +472,9 @@ class Memory {
   static String _message;
 
   static void retain(CompleteManga mg) {
-    if(!_manga.containsKey(mg.id)) {
-      _manga[mg.id] = Chapters.all(mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+    if (!_manga.containsKey(mg.id)) {
+      _manga[mg.id] = Chapters.all(
+          mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
       _sequence.add(mg.id);
       if (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
@@ -376,7 +487,8 @@ class Memory {
 
   static void retainLinked(LinkedManga mg) {
     if (!_manga.containsKey(mg.id)) {
-      _manga[mg.id] = Chapters.all(mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+      _manga[mg.id] = Chapters.all(
+          mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
       _sequence.add(mg.id);
       if (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
@@ -427,7 +539,8 @@ class ReadChapter {
   String mangaId;
   int pageNumber;
 
-  ReadChapter.all({this.chapterId, this.timestamp, this.mangaId, this.pageNumber});
+  ReadChapter.all(
+      {this.chapterId, this.timestamp, this.mangaId, this.pageNumber});
 
   Map<String, dynamic> toMap() {
     return {
@@ -444,7 +557,13 @@ class SavedManga extends MangaHeading {
 
   SavedManga();
 
-  SavedManga.all({this.index, String id, String name, String coverURL, String description, String allGenres})
+  SavedManga.all(
+      {this.index,
+      String id,
+      String name,
+      String coverURL,
+      String description,
+      String allGenres})
       : super.all(
           id: id,
           name: name,
@@ -495,7 +614,8 @@ class MangaHeading {
 
   MangaHeading();
 
-  MangaHeading.all({this.id, this.name, this.coverURL, this.description, this.allGenres});
+  MangaHeading.all(
+      {this.id, this.name, this.coverURL, this.description, this.allGenres});
 
   factory MangaHeading.fromJSON(Map<String, dynamic> json) {
     return MangaHeading.all(
@@ -558,7 +678,7 @@ class MangaQuery {
       'name': name,
       'limit': limit,
       'offset': offset,
-      'genreIds' : genres,
+      'genreIds': genres,
     };
   }
 
@@ -587,7 +707,9 @@ class MangaQueryResponse {
   factory MangaQueryResponse.fromJSON(Map<String, dynamic> json) {
     return MangaQueryResponse.all(
       query: MangaQuery.fromJSON(json['query']),
-      headings: (json['headings'] as List).map((e) => MangaHeading.fromJSON(e)).toList(),
+      headings: (json['headings'] as List)
+          .map((e) => MangaHeading.fromJSON(e))
+          .toList(),
     );
   }
 }
@@ -601,7 +723,15 @@ class HomePageRoot {
   HomePageRoot.all({this.title, this.designator, this.data, this.children});
 
   factory HomePageRoot.fromJSON(Map<String, dynamic> json) {
-    return HomePageRoot.all(title: json['title'], designator: json['designator'], data: (json['data'] as List).map((e) => MangaHeading.fromJSON(e)).toList(), children: (json['children'] as List).map((e) => HomePageRoot.fromJSON(e)).toList());
+    return HomePageRoot.all(
+        title: json['title'],
+        designator: json['designator'],
+        data: (json['data'] as List)
+            .map((e) => MangaHeading.fromJSON(e))
+            .toList(),
+        children: (json['children'] as List)
+            .map((e) => HomePageRoot.fromJSON(e))
+            .toList());
   }
 }
 
@@ -657,7 +787,13 @@ class ChapterData {
   DateTime updatedAt;
   int watchTime;
 
-  ChapterData.all({this.id, this.sequenceNumber, this.chapterName, this.chapterNumber, this.updatedAt, this.watchTime});
+  ChapterData.all(
+      {this.id,
+      this.sequenceNumber,
+      this.chapterName,
+      this.chapterNumber,
+      this.updatedAt,
+      this.watchTime});
 
   factory ChapterData.fromJSON(Map<String, dynamic> json) {
     return ChapterData.all(
@@ -665,7 +801,8 @@ class ChapterData {
       sequenceNumber: json["sequenceNumber"],
       chapterName: json["chapterName"],
       chapterNumber: json["chapterNumber"],
-      updatedAt: json["updatedAt"] != null ? DateTime.parse(json["updatedAt"]) : null,
+      updatedAt:
+          json["updatedAt"] != null ? DateTime.parse(json["updatedAt"]) : null,
       watchTime: json["watchTime"],
     );
   }
@@ -678,7 +815,8 @@ class LinkedManga {
   Source source;
   Map<int, ChapterData> chapters;
 
-  LinkedManga.all({this.id, this.name, this.coverURL, this.source, this.chapters});
+  LinkedManga.all(
+      {this.id, this.name, this.coverURL, this.source, this.chapters});
 
   factory LinkedManga.fromJSON(Map<String, dynamic> json) {
     Map<int, ChapterData> dts = {};
@@ -711,7 +849,20 @@ class CompleteManga {
   DateTime lastUpdated;
   List<LinkedManga> linkedMangas;
 
-  CompleteManga.all({this.id, this.title, this.description, this.linkedId, this.coverURL, this.source, this.authors, this.artists, this.genres, this.chapters, this.status, this.lastUpdated, this.linkedMangas});
+  CompleteManga.all(
+      {this.id,
+      this.title,
+      this.description,
+      this.linkedId,
+      this.coverURL,
+      this.source,
+      this.authors,
+      this.artists,
+      this.genres,
+      this.chapters,
+      this.status,
+      this.lastUpdated,
+      this.linkedMangas});
 
   factory CompleteManga.fromJSON(Map<String, dynamic> json) {
     Map<String, dynamic> main = json["main"];
@@ -727,13 +878,19 @@ class CompleteManga {
       linkedId: main["linkedId"],
       coverURL: main["coverURL"],
       source: Source.fromJSON(main["source"]),
-      authors: (main["authors"] as List).map((e) => Author.fromJSON(e)).toList(),
-      artists: (main["artists"] as List).map((e) => Artist.fromJSON(e)).toList(),
+      authors:
+          (main["authors"] as List).map((e) => Author.fromJSON(e)).toList(),
+      artists:
+          (main["artists"] as List).map((e) => Artist.fromJSON(e)).toList(),
       genres: (main["genres"] as List).map((e) => Genre.fromJSON(e)).toList(),
       chapters: dts,
       status: main["status"],
-      lastUpdated: main["lastUpdated"] != null ? DateTime.parse(main["lastUpdated"]) : null,
-      linkedMangas: (json["related"] as List).map((e) => LinkedManga.fromJSON(e)).toList(),
+      lastUpdated: main["lastUpdated"] != null
+          ? DateTime.parse(main["lastUpdated"])
+          : null,
+      linkedMangas: (json["related"] as List)
+          .map((e) => LinkedManga.fromJSON(e))
+          .toList(),
     );
   }
 }
@@ -744,7 +901,8 @@ class ChapterContent {
   ChapterContent.all({this.urls});
 
   factory ChapterContent.fromJSON(List<dynamic> json) {
-    return ChapterContent.all(urls: json.map((e) => e['url'].toString()).toList());
+    return ChapterContent.all(
+        urls: json.map((e) => e['url'].toString()).toList());
   }
 }
 
