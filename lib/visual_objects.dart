@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:intl/intl.dart' as intl;
 import 'package:manga_frontend/api_objects.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:transparent_image/transparent_image.dart';
@@ -420,7 +421,6 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
 //   }
 // }
 
-
 class MangaPageChapterList extends StatefulWidget {
   final Function onClick;
   final Map<int, ChapterData> chaps;
@@ -451,9 +451,9 @@ class _MangaPageChapterListState extends State<MangaPageChapterList> {
 
   @override
   Widget build(BuildContext context) {
-    if(_lastInitialScroll != widget.position.index){
+    if (_lastInitialScroll != widget.position.index) {
       _lastInitialScroll = widget.position.index;
-      if(_isc.isAttached){
+      if (_isc.isAttached) {
         _isc.jumpTo(index: _lastInitialScroll);
       }
     }
@@ -875,11 +875,14 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
 }
 
 class ReaderPageInfoPanel extends StatelessWidget {
-  final String dateString;
-  final String batteryString;
-  final String pageInfo;
+  static final intl.DateFormat _formatter = intl.DateFormat.jm();
 
-  const ReaderPageInfoPanel({Key key, this.dateString, this.batteryString, this.pageInfo}) : super(key: key);
+  final DateTime date;
+  final int battery;
+  final int pageNum;
+  final int chapLength;
+
+  const ReaderPageInfoPanel({Key key, this.date, this.battery, this.pageNum, this.chapLength}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -887,8 +890,7 @@ class ReaderPageInfoPanel extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
       color: Colors.black54,
       child: Text(
-        (this.dateString + " " + this.batteryString + " " + this.pageInfo).trim(),
-        // _formatter.format(DateTime.now()) + " Battery: " + snapshot.data.toString() + "% " + this.pageInfo,
+        ((date == null ? "?" : _formatter.format(date)) + " Battery: " + (battery == null ? "?" : battery.toString()) + "% " + (pageNum == null || chapLength == null ? "?/?" : pageNum.toString() + "/" + chapLength.toString())).trim(),
         style: TextStyle(color: Colors.white),
       ),
     );
@@ -972,36 +974,12 @@ class FavouriteManga extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: this.side,
-      color: Colors.black,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            child: CachedNetworkImage(
-              imageUrl: this.coverURL,
-              fadeInDuration: const Duration(),
-              fit: BoxFit.contain,
-            ),
-            width: this.side,
-            height: this.side,
-          ),
-          SizedBox(
-            height: 5,
-          ),
-          Text(
-            name,
-            softWrap: true,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
+        width: this.side,
+        color: Colors.black,
+        child: MangaCover(
+          name: name,
+          coverURL: coverURL,
+        ));
   }
 }
 

@@ -1165,7 +1165,7 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   static const int _RIGHT_TO_LEFT = 1;
   static const int _UP_TO_DOWN = 2;
 
-  static final DateFormat _formatter = DateFormat.jm();
+  // static final DateFormat _formatter = DateFormat.jm();
   static final Battery _battery = Battery();
 
   static const int thresholdForWheelPopOut = 30;
@@ -1205,6 +1205,8 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
   int _currPage;
   int _currChapLength;
   Stream _info;
+  Stream<int> _batStream;
+  Stream<DateTime> _datStream;
 
   bool disposed = false;
 
@@ -1214,7 +1216,9 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     _current = Memory.remember(this.widget.mangaId, this.widget.index);
     _link = LayerLink();
     _timer = RestartableTimer(Duration(seconds: 2), collapseTopBar);
-    _info = infoStream(_battery);
+    // _info = infoStream(_battery);
+    _batStream = batteryStream(_battery);
+    _datStream = Stream.periodic(Duration(milliseconds: 500), (t) => DateTime.now());
     _animationControllerForAppBar = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 200),
@@ -1265,11 +1269,17 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
     assembleProper(_formalIndexAtStartOfCurrentChapter, currNum);
   }
 
-  Stream<InfoPanelData> infoStream(Battery b) async* {
+  // Stream<InfoPanelData> infoStream(Battery b) async* {
+  //   while (this.mounted) {
+  //     int x = await b.batteryLevel;
+  //     String s = _formatter.format(DateTime.now());
+  //     yield InfoPanelData(x.toString(), s);
+  //   }
+  // }
+
+  Stream<int> batteryStream(Battery b) async* {
     while (this.mounted) {
-      int x = await b.batteryLevel;
-      String s = _formatter.format(DateTime.now());
-      yield InfoPanelData(x.toString(), s);
+      yield await b.batteryLevel;
     }
   }
 
@@ -1661,15 +1671,37 @@ class _ReaderWidgetState extends State<ReaderWidget> with SingleTickerProviderSt
             Positioned(
               bottom: 0,
               right: 0,
-              child: StreamBuilder(
-                stream: _info,
-                initialData: InfoPanelData("?", "?"),
-                builder: (context, snapshot) {
-                  InfoPanelData data = snapshot.data as InfoPanelData;
-                  return ReaderPageInfoPanel(
-                    pageInfo: _currPage == null || _currChapLength == null ? "?/?" : _currPage.toString() + "/" + _currChapLength.toString(),
-                    dateString: data.time,
-                    batteryString: "Battery: " + data.batteryLevel + "%",
+              // child: StreamBuilder(
+              //   stream: _info,
+              //   initialData: InfoPanelData("?", "?"),
+              //   builder: (context, snapshot) {
+              //     InfoPanelData data = snapshot.data as InfoPanelData;
+              //     return ReaderPageInfoPanel(
+              //       pageInfo: _currPage == null || _currChapLength == null ? "?/?" : _currPage.toString() + "/" + _currChapLength.toString(),
+              //       dateString: data.time,
+              //       batteryString: "Battery: " + data.batteryLevel + "%",
+              //     );
+              //   },
+              // ),
+              child: StreamBuilder<DateTime>(
+                stream: _datStream,
+                initialData: null,
+                builder: (context, date) {
+                  return StreamBuilder<int>(
+                    stream: _batStream,
+                    initialData: null,
+                    builder: (context, battery) {
+                      int bat;
+                      if (battery.hasData) {
+                        bat = battery.data;
+                      }
+                      return ReaderPageInfoPanel(
+                        pageNum: _currPage,
+                        chapLength: _currChapLength,
+                        date: date.data,
+                        battery: bat,
+                      );
+                    },
                   );
                 },
               ),
