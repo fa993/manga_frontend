@@ -19,7 +19,7 @@ class Widgeter {
   static double descriptionFontSize = 12.0;
   static double genreFontSize = 14.0;
   static double nameFontSize = 16.0;
-  static String fontFamily = "monospace";
+  static String fontFamily = "VerseMonospace";
   static double mangaPageGenresFontSize = 20.0;
   static double mangaPageDescriptionFontSize = 16.0;
   static double mangaPageChapterPanelHeight = 40.0 + 16.0 + 16.0;
@@ -29,6 +29,8 @@ class Widgeter {
   static double mangaPageChapterButtonHeight = 50.0;
   static double mangaPageChapterGridSpacingWidth = 10.0;
   static double mangaPageChapterGridSpacingHeight = 10.0;
+  static double mangaCoverFontSize = 13.0;
+  static double pixelDensityFactor = 0.4;
 
   static Image img = Image.memory(
     kTransparentImage,
@@ -53,11 +55,25 @@ class MangaThumbnail extends StatefulWidget {
 }
 
 class _MangaThumbnailState extends State<MangaThumbnail> {
+  double _descriptionFontSize;
+  double _genreFontSize;
+  double _nameFontSize;
+
   bool _isSaved;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    double x =
+        MediaQuery.of(context).devicePixelRatio * Widgeter.pixelDensityFactor;
+    _descriptionFontSize = Widgeter.descriptionFontSize * x;
+    _genreFontSize = Widgeter.genreFontSize * x;
+    _nameFontSize = Widgeter.nameFontSize * x;
   }
 
   @override
@@ -119,13 +135,13 @@ class _MangaThumbnailState extends State<MangaThumbnail> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
+                            SizedBox(
                                 height: Widgeter.imgHeight - Widgeter.gapSpace,
                                 child: Text(
                                   widget.hd.description,
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: Widgeter.descriptionFontSize,
+                                    fontSize: _descriptionFontSize,
                                     fontFamily: Widgeter.fontFamily,
                                     decoration: TextDecoration.none,
                                   ),
@@ -136,7 +152,7 @@ class _MangaThumbnailState extends State<MangaThumbnail> {
                               widget.hd.allGenres,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: Widgeter.genreFontSize,
+                                fontSize: _genreFontSize,
                                 fontFamily: Widgeter.fontFamily,
                                 decoration: TextDecoration.none,
                               ),
@@ -155,7 +171,7 @@ class _MangaThumbnailState extends State<MangaThumbnail> {
                   widget.hd.name,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: Widgeter.nameFontSize,
+                    fontSize: _nameFontSize,
                     fontFamily: Widgeter.fontFamily,
                     decoration: TextDecoration.none,
                   ),
@@ -171,8 +187,6 @@ class _MangaThumbnailState extends State<MangaThumbnail> {
 }
 
 class MangaPageDescription extends StatelessWidget {
-  static double mangaPageDescriptionFontSize = 16.0;
-
   final String description;
 
   const MangaPageDescription({Key key, this.description}) : super(key: key);
@@ -182,32 +196,36 @@ class MangaPageDescription extends StatelessWidget {
     return Text(
       description,
       style: TextStyle(
-          color: Colors.white,
-          fontFamily: Widgeter.fontFamily,
-          fontSize: mangaPageDescriptionFontSize),
+        color: Colors.white,
+        fontFamily: Widgeter.fontFamily,
+        fontSize: Widgeter.mangaPageDescriptionFontSize *
+            MediaQuery.of(context).devicePixelRatio *
+            Widgeter.pixelDensityFactor,
+      ),
     );
   }
 }
 
 class MangaPageGenres extends StatelessWidget {
-  static double mangaPageGenresFontSize = 20.0;
-
   final List<Genre> genres;
 
   const MangaPageGenres({Key key, this.genres}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Align(
         alignment: Alignment.center,
         child: Text(
           genres
               .map((e) => e.name[0].toUpperCase() + e.name.substring(1))
               .reduce((value, element) => value += ", " + element),
           style: TextStyle(
-              color: Colors.white,
-              fontFamily: Widgeter.fontFamily,
-              fontSize: mangaPageGenresFontSize),
+            color: Colors.white,
+            fontFamily: Widgeter.fontFamily,
+            fontSize: Widgeter.mangaPageGenresFontSize *
+                MediaQuery.of(context).devicePixelRatio *
+                Widgeter.pixelDensityFactor,
+          ),
         ));
   }
 }
@@ -1131,13 +1149,12 @@ class MangaCover extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Flexible(
+        Expanded(
           child: CachedNetworkImage(
             imageUrl: this.coverURL,
             fit: BoxFit.contain,
             fadeInDuration: const Duration(),
           ),
-          fit: FlexFit.loose,
         ),
         SizedBox(
           height: 5,
@@ -1149,6 +1166,10 @@ class MangaCover extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: Colors.white,
+            fontSize: MediaQuery.of(context).devicePixelRatio *
+                Widgeter.pixelDensityFactor *
+                Widgeter.mangaCoverFontSize,
+            fontFamily: Widgeter.fontFamily,
           ),
         ),
       ],

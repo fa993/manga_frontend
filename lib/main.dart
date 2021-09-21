@@ -299,13 +299,15 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   MangaRouteDelegate(bool f) : navigatorKey = GlobalKey<NavigatorState>() {
     homePage = MyRoute(
       key: ValueKey('HomePage'),
-      builder: (context) => MyHomePage(
-        onSearchPageClick: pushSearchPage,
-        onMangaClick: pushMangaPage,
-        pushDirectToManga: pushDirectlyToManga,
-        pushDirectToReader: pushDirectlyToChapter,
-        pushToLost: pushLostPage,
-        fcmInit: f,
+      builder: (context) => TextScaleFactorClamper(
+        child: MyHomePage(
+          onSearchPageClick: pushSearchPage,
+          onMangaClick: pushMangaPage,
+          pushDirectToManga: pushDirectlyToManga,
+          pushDirectToReader: pushDirectlyToChapter,
+          pushToLost: pushLostPage,
+          fcmInit: f,
+        ),
       ),
     );
   }
@@ -328,11 +330,13 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   void pushMangaPage(String mangaId) {
     pages.add(
       MyRoute(
-        builder: (context) => MangaPageWidget(
-          mangaId: mangaId,
-          onChapterClicked: pushReaderPage,
+        builder: (context) => TextScaleFactorClamper(
+          child: MangaPageWidget(
+            mangaId: mangaId,
+            onChapterClicked: pushReaderPage,
+          ),
+          key: ValueKey('MangaPage'),
         ),
-        key: ValueKey('MangaPage'),
       ),
     );
     notifyListeners();
@@ -341,13 +345,15 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   void pushReaderPage(String mangaId, int index, int pgNum) {
     pages.add(
       MyRoute(
-        builder: (context) => ReaderWidget(
-          mangaId: mangaId,
-          index: index,
-          onPageTurned: pageTurnCallback,
-          lastSave: pgNum,
+        builder: (context) => TextScaleFactorClamper(
+          child: ReaderWidget(
+            mangaId: mangaId,
+            index: index,
+            onPageTurned: pageTurnCallback,
+            lastSave: pgNum,
+          ),
+          key: ValueKey('ReaderPage'),
         ),
-        key: ValueKey('ReaderPage'),
       ),
     );
     notifyListeners();
@@ -356,11 +362,13 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   void pushSearchPage(bool includeDB) {
     pages.add(
       MyRoute(
-        builder: (context) => SearchPageWidget(
-          includeDBResults: includeDB,
-          onClickManga: pushMangaPage,
+        builder: (context) => TextScaleFactorClamper(
+          child: SearchPageWidget(
+            includeDBResults: includeDB,
+            onClickManga: pushMangaPage,
+          ),
+          key: ValueKey('SearchPage'),
         ),
-        key: ValueKey('SearchPage'),
       ),
     );
     notifyListeners();
@@ -379,11 +387,13 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
     pages.clear();
     pages.add(
       MyRoute(
-        builder: (context) => MangaPageWidget(
-          mangaId: mangaId,
-          onChapterClicked: pushReaderPage,
+        builder: (context) => TextScaleFactorClamper(
+          child: MangaPageWidget(
+            mangaId: mangaId,
+            onChapterClicked: pushReaderPage,
+          ),
+          key: ValueKey('MangaPage'),
         ),
-        key: ValueKey('MangaPage'),
       ),
     );
     pushReaderPage(mangaId, index, pgNum);
@@ -439,6 +449,22 @@ class MangaRouteDelegate extends RouterDelegate<MangaRoutePath>
   }
 }
 
+class TextScaleFactorClamper extends StatelessWidget {
+  final Widget child;
+
+  const TextScaleFactorClamper({Key key, this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final MediaQueryData data = MediaQuery.of(context);
+    final double tScale = data.textScaleFactor.clamp(1.0, 1.5);
+    return MediaQuery(
+      data: data.copyWith(textScaleFactor: tScale),
+      child: child,
+    );
+  }
+}
+
 class MyHomePage extends StatefulWidget {
   final String title;
   final Function(bool) onSearchPageClick;
@@ -475,7 +501,9 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _setupFCM();
+    if (widget.fcmInit) {
+      _setupFCM();
+    }
     _actualNavs = <Widget>[
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -687,6 +715,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void fetchBegin([bool entry = false]) async {
+    _loading = true;
     _finished = false;
     List<MangaHeading> hd = await doFetchManga(0, 20);
     int i = -1;
@@ -704,6 +733,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (entry) {
       _genreEntry?.markNeedsBuild();
     }
+    _loading = false;
   }
 
   Future<List<MangaHeading>> doFetchManga(int offset, [int length]) async {
@@ -736,7 +766,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void fetchGenres() async {
     List<Genre> gen = await APIer.fetchGenres();
-    for(Genre g in gen){
+    for (Genre g in gen) {
       g.name = g.name[0].toUpperCase() + g.name.substring(1).toLowerCase();
     }
     if (mounted) {
@@ -996,7 +1026,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
     _mangaQuery.offset = _hdFromAPI.length;
     APIer.fetchSearch(_mangaQuery).then((value) {
       if (_mangaQuery == value.query) {
-        if (value.headings.isEmpty) {
+        if (value.headings.isEmpty || value.headings.length != limit) {
           _finished = true;
         }
         for (int i = 0, j = 0; i < value.headings.length; i++) {
@@ -1055,12 +1085,6 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // WidgetsBinding.instance.scheduleFrameCallback((timeStamp) {
-    //   if (_sc.position.atEdge && _mangaQuery.name != null && _mangaQuery.name.isNotEmpty && !_finished) {
-    //     print('Through callback');
-    //     fetchMore();
-    //   }
-    // });
     return Scaffold(
         backgroundColor: Colors.black,
         body: NotificationListener<ScrollStartNotification>(
@@ -1157,7 +1181,7 @@ class MangaPageWidget extends StatefulWidget {
 }
 
 class _MangaPageWidgetState extends State<MangaPageWidget> {
-  ScrollController _sc = new ScrollController();
+  ScrollController _sc;
   Future<CompleteManga> _mn;
   bool _scrolled = false;
 
@@ -1168,19 +1192,19 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sc = ScrollController(
+        initialScrollOffset: MediaQuery.of(context).size.height / 2);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder(
       future: _mn,
       builder: (context, snapshot) {
         CompleteManga com = snapshot.data;
         if (snapshot.hasData) {
-          WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-            if (_sc.hasClients && !_scrolled) {
-              _sc.jumpTo(min(MediaQuery.of(context).size.height / 2,
-                  _sc.position.maxScrollExtent));
-              _scrolled = true;
-            }
-          });
           return Scaffold(
             backgroundColor: Colors.black,
             body: NestedScrollView(
