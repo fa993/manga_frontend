@@ -542,11 +542,13 @@ class _MangaPageCustomChapterGridState
             (Widgeter.mangaPageChapterButtonHeight +
                 Widgeter.mangaPageChapterGridSpacingHeight));
     _controller.addListener(() {
-      widget.position.index = numOfChapsPerRow *
-          (_controller.offset /
-                  (Widgeter.mangaPageChapterButtonHeight +
-                      Widgeter.mangaPageChapterGridSpacingHeight))
-              .ceil();
+      widget.position.index = max(
+          0,
+          numOfChapsPerRow *
+              (_controller.offset /
+                      (Widgeter.mangaPageChapterButtonHeight +
+                          Widgeter.mangaPageChapterGridSpacingHeight))
+                  .ceil());
     });
   }
 
@@ -673,9 +675,12 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
         break;
       }
       double left = leftOffsetMain;
-      for (int j = 0; j < numOfChapsPerRow; j++) {
+      for (int j = 0; j < numOfChapsPerRow; j++, startIndex++) {
         if (startIndex >= chaps.length) {
           break;
+        }
+        if (startIndex < 0) {
+          continue;
         }
         canvas.drawRRect(
             RRect.fromLTRBR(
@@ -703,7 +708,6 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
                   left + chapterButtonPaddingX, top + chapterButtonPaddingY));
         left += Widgeter.mangaPageChapterButtonWidth +
             Widgeter.mangaPageChapterGridSpacingWidth;
-        startIndex++;
       }
       top += Widgeter.mangaPageChapterButtonHeight +
           Widgeter.mangaPageChapterGridSpacingHeight;
