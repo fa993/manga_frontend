@@ -19,12 +19,13 @@ class APIer {
   static Random _rd = Random();
 
   static Future<T> _retryExponentialBackOff<T>(Future<T> Function() func,
-          {double count = -1, int maxWaitTime = 64}) async =>
+          {int count = -1, int maxWaitTime = 64}) async =>
       await Future.delayed(
               Duration(
+                milliseconds: count < 0 ? 0 : (_rd.nextDouble() * 1000).toInt(),
                   seconds: count < 0
                       ? 0
-                      : min(maxWaitTime, pow(2, count) + _rd.nextDouble())),
+                      : min(maxWaitTime, pow(2, count))),
               func)
           .onError((error, stackTrace) => _retryExponentialBackOff(
                 func,
