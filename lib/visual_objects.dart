@@ -652,7 +652,6 @@ class MangaPageCustomChapterGridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
     int rowsScrolled = (controller.offset /
             (Widgeter.mangaPageChapterGridSpacingHeight +
                 Widgeter.mangaPageChapterButtonHeight))
