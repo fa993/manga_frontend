@@ -536,7 +536,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _handleMessage(RemoteMessage message) {
-    //TODO some error here.. does not work when app is terminated
     if (message.data.containsKey('uri')) {
       setState(() {
         _homeLabel += "2";
