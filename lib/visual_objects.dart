@@ -1156,7 +1156,8 @@ class MangaCover extends StatelessWidget {
         Expanded(
           child: CachedNetworkImage(
             imageUrl: this.coverURL,
-            fit: BoxFit.contain,
+            // fit: BoxFit.contain,
+            fit: BoxFit.cover,
             fadeInDuration: const Duration(),
           ),
         ),
