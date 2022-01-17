@@ -61,7 +61,11 @@ class Notification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(height: 40.0, child: Text(content.message), foregroundDecoration: BoxDecoration(border: Border.all(color: Colors.orange)));
+    return Container(
+        height: 40.0,
+        child: Text(content.message),
+        foregroundDecoration:
+            BoxDecoration(border: Border.all(color: Colors.orange)));
   }
 }
 

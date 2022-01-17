@@ -11,7 +11,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart' as uuid;
 
 class APIer {
-  static String _serverURL = "https://192.168.29.227:8080";
+  static String _serverURL = "https://lite.floricaninfosoft.com:9432";
   static String _serverMapping = "/public/manga";
 
   static http.Client _cli = new http.Client();
@@ -22,10 +22,9 @@ class APIer {
           {int count = -1, int maxWaitTime = 64}) async =>
       await Future.delayed(
               Duration(
-                milliseconds: count < 0 ? 0 : (_rd.nextDouble() * 1000).toInt(),
-                  seconds: count < 0
-                      ? 0
-                      : min(maxWaitTime, pow(2, count))),
+                  milliseconds:
+                      count < 0 ? 0 : (_rd.nextDouble() * 1000).toInt(),
+                  seconds: count < 0 ? 0 : min(maxWaitTime, pow(2, count))),
               func)
           .onError((error, stackTrace) => _retryExponentialBackOff(
                 func,
@@ -59,9 +58,7 @@ class APIer {
   static Future<List<Genre>> fetchGenres() async =>
       _retryExponentialBackOff(_fetchGenres);
 
-
   //
-
 
   static Future<List<SavedManga>> _fetchFavourites() async {
     final response =
