@@ -872,7 +872,7 @@ class _MangaPageState extends State<MangaPage> {
   }
 }
 
-class ChapterPage extends StatelessWidget {
+class ChapterPageForVertical extends StatelessWidget {
   static Map<String, Map<String, String>> headers = {
     "manganelo": {"Referer": "https://manganelo.com/"},
     "readm": {},
@@ -882,7 +882,7 @@ class ChapterPage extends StatelessWidget {
   final Source s;
   final double width;
 
-  const ChapterPage({Key key, this.url, this.s, this.width}) : super(key: key);
+  const ChapterPageForVertical({Key key, this.url, this.s, this.width}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -913,6 +913,49 @@ class ChapterPage extends StatelessWidget {
     );
   }
 }
+
+class ChapterPageForHorizontal extends StatelessWidget {
+  static Map<String, Map<String, String>> headers = {
+    "manganelo": {"Referer": "https://manganelo.com/"},
+    "readm": {},
+  };
+
+  final String url;
+  final Source s;
+  final BoxFit fit;
+
+  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return CachedNetworkImage(
+      httpHeaders: headers[s.name],
+      imageUrl: url,
+      fit: fit,
+      fadeInDuration: Duration.zero,
+      progressIndicatorBuilder: (context, s, pr) => Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: CircularProgressIndicator(
+            value: pr.progress,
+          ),
+        ),
+      ),
+      errorWidget: (context, s, data) => Center(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Icon(
+            Icons.error,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 class ChapterPageFromProvider extends StatelessWidget {
   final ImageProvider provider;

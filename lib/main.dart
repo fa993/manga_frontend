@@ -1751,7 +1751,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
                             w = CenteredFixedCircle();
                           } else {
                             w = InteractiveViewer(
-                              child: ChapterPage(
+                              child: ChapterPageForVertical(
                                 url: chp.content.urls[pgNum],
                                 s: chp.source,
                                 width: MediaQuery.of(context).size.width,
@@ -1783,12 +1783,10 @@ class _ReaderWidgetState extends State<ReaderWidget>
                           } else {
                             w = Center(
                               child: InteractiveViewer(
-                                child: SingleChildScrollView(
-                                  child: ChapterPage(
-                                    url: chp.content.urls[pgNum],
-                                    s: chp.source,
-                                    width: MediaQuery.of(context).size.width,
-                                  ),
+                                child: ChapterPageForHorizontal(
+                                  url: chp.content.urls[pgNum],
+                                  s: chp.source,
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                             );
