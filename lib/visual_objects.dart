@@ -788,7 +788,7 @@ class _MangaPageState extends State<MangaPage> {
         },
         itemBuilder: (context, index) {
           if (index > 3) {
-            MangaPageChapterPanel(
+            return MangaPageChapterPanel(
               mangaId: widget.manga.linkedMangas[index - 3 - 1].id,
               s: widget.manga.linkedMangas[index - 3 - 1].source,
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
