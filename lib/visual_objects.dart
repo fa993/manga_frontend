@@ -853,7 +853,7 @@ class _MangaPageState extends State<MangaPage> {
                             in widget.manga.linkedMangas[i].chapters.entries) {
                           if (ent.value.id == value) {
                             match = ent;
-                            mId = widget.manga.id;
+                            mId = widget.manga.linkedMangas[i].id;
                             break;
                           }
                         }
