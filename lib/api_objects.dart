@@ -340,7 +340,9 @@ class DBer {
         conflictAlgorithm: ConflictAlgorithm.rollback,
       );
     });
-    _notifierForFavourites.value += 1;
+    if(_notifierForFavourites != null) {
+      _notifierForFavourites.value += 1;
+    }
     return null;
   }
 
@@ -350,7 +352,9 @@ class DBer {
       where: 'saved_manga_id = ?',
       whereArgs: [id],
     );
-    _notifierForFavourites.value += 1;
+    if(_notifierForFavourites != null) {
+      _notifierForFavourites.value += 1;
+    }
     return null;
   }
 
@@ -402,7 +406,9 @@ class DBer {
       ).toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    _notifierForChapter.value += 1;
+    if(_notifierForChapter != null) {
+      _notifierForChapter.value += 1;
+    }
   }
 
   static void updateChapterPage(String chapterId, int pgNum) async {
