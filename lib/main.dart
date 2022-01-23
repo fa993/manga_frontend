@@ -1333,6 +1333,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
       LinkedManga part = await APIer.fetchPartManga(this.widget.mangaId);
       _current = Chapters.all(
           mangaId: part.id,
+          linkedId: part.linkedId,
           chaps: part.chapters,
           s: part.source,
           currentIndex: this.widget.index);
@@ -1360,7 +1361,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
     }
     _currIndex = currNum;
     DBer.readChapter(
-        _current.mangaId, _current.chaps[_current.currentIndex].id, currNum);
+        _current.mangaId, _current.linkedId, _current.chaps[_current.currentIndex].id, currNum);
     _formalIndexAtStartOfCurrentChapter = (pgNum);
     _formalIndexForList = _formalIndexAtStartOfCurrentChapter + currNum;
     PageController pageController = PageController(
@@ -1397,7 +1398,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
     int nIn = nCurr - 1;
     if (_currentChapterId != _current.chaps[chapIndex].id) {
       _currentChapterId = _current.chaps[chapIndex].id;
-      DBer.readChapter(_current.mangaId, _currentChapterId, nIn);
+      DBer.readChapter(_current.mangaId, _current.linkedId, _currentChapterId, nIn);
     }
     if (nIn != _currIndex) {
       _currIndex = nIn;

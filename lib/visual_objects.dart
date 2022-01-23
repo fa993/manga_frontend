@@ -234,7 +234,7 @@ class MangaPageButtonPanel extends StatelessWidget {
   final Future<bool> isFavourite;
   final Function(bool) onToggleFavourite;
   final Future<ChapterSlice> readChapter;
-  final Function(int) onClickReadChapter;
+  final Function(String, int) onClickReadChapter;
 
   const MangaPageButtonPanel(
       {Key key,
@@ -290,7 +290,8 @@ class MangaPageButtonPanel extends StatelessWidget {
             Function onP;
             String tex;
             if (snapshot.hasData) {
-              onP = () => onClickReadChapter.call(snapshot.data.chapterIndex);
+              onP = () => onClickReadChapter.call(
+                  snapshot.data.mangaId, snapshot.data.chapterIndex);
               tex = snapshot.data.displayText;
             } else if (snapshot.hasError) {
               print(snapshot.error);
@@ -832,25 +833,53 @@ class _MangaPageState extends State<MangaPage> {
                             .then((value) => setState(() => _isSaved = false));
                       }
                     },
-                    readChapter: DBer.getMostRecentReadChapter(widget.manga.id)
+                    readChapter: DBer.getMostRecentReadChapterByLinkedId(
+                            widget.manga.linkedId)
                         .then((value) {
-                      MapEntry<int, ChapterData> ent = widget
-                          .manga.chapters.entries
-                          .firstWhere((element) => element.value.id == value,
-                              orElse: () =>
-                                  widget.manga.chapters.entries.first);
-                      return ChapterSlice.all(
-                          MangaPageChapterPanel.chapterToDisplayString(
-                              ent.value),
-                          ent.key);
+                      String mId;
+                      MapEntry<int, ChapterData> match;
+                      for (MapEntry<int, ChapterData> ent
+                          in widget.manga.chapters.entries) {
+                        if (ent.value.id == value) {
+                          match = ent;
+                          mId = widget.manga.id;
+                          break;
+                        }
+                      }
+                      for (int i = 0;
+                          i < widget.manga.linkedMangas.length && match == null;
+                          i++) {
+                        for (MapEntry<int, ChapterData> ent
+                            in widget.manga.linkedMangas[i].chapters.entries) {
+                          if (ent.value.id == value) {
+                            match = ent;
+                            mId = widget.manga.id;
+                            break;
+                          }
+                        }
+                      }
+                      if (match == null) {
+                        return ChapterSlice.all(
+                            MangaPageChapterPanel.chapterToDisplayString(
+                                widget.manga.chapters[0]),
+                            0,
+                            widget.manga.id);
+                      } else {
+                        return ChapterSlice.all(
+                            MangaPageChapterPanel.chapterToDisplayString(
+                                match.value),
+                            match.key,
+                            mId);
+                      }
                     }, onError: (t) {
                       return ChapterSlice.all(
                           MangaPageChapterPanel.chapterToDisplayString(
                               widget.manga.chapters[0]),
-                          0);
+                          0,
+                          widget.manga.id);
                     }),
-                    onClickReadChapter: (t) {
-                      widget.onClickChapter.call(widget.manga.id, t, null);
+                    onClickReadChapter: (mId, t) {
+                      widget.onClickChapter.call(mId, t, null);
                       // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
                     },
                   );
@@ -885,7 +914,8 @@ class ChapterPageForVertical extends StatelessWidget {
   final Source s;
   final double width;
 
-  const ChapterPageForVertical({Key key, this.url, this.s, this.width}) : super(key: key);
+  const ChapterPageForVertical({Key key, this.url, this.s, this.width})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -927,7 +957,8 @@ class ChapterPageForHorizontal extends StatelessWidget {
   final Source s;
   final BoxFit fit;
 
-  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit}) : super(key: key);
+  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -958,7 +989,6 @@ class ChapterPageForHorizontal extends StatelessWidget {
     );
   }
 }
-
 
 class ChapterPageFromProvider extends StatelessWidget {
   final ImageProvider provider;
@@ -1231,8 +1261,9 @@ class MangaCover extends StatelessWidget {
 class ChapterSlice {
   String displayText;
   int chapterIndex;
+  String mangaId;
 
-  ChapterSlice.all(this.displayText, this.chapterIndex);
+  ChapterSlice.all(this.displayText, this.chapterIndex, this.mangaId);
 }
 
 class ChapterScrollPosition {

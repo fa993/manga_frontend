@@ -214,9 +214,9 @@ class DBer {
         join(await getDatabasesPath(), _databaseName),
         onCreate: (db, version) async {
           await db.execute(
-              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
-          await db.execute(
               'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
+          await db.execute(
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, linked_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
           await db.execute(
               'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
@@ -226,7 +226,7 @@ class DBer {
               'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE IF EXISTS $_chapterTableName');
           await db.execute(
-              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, linked_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
           await db.execute('DROP TABLE IF EXISTS $_mangaPreferencesTableName');
           await db.execute(
               'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
@@ -237,12 +237,12 @@ class DBer {
               'CREATE TABLE $_savedMangaTableName(saved_manga_id TEXT, name STRING, coverURL TEXT, all_genres TEXT, description TEXT, manga_index INTEGER, PRIMARY KEY(saved_manga_id))');
           await db.execute('DROP TABLE IF EXISTS $_chapterTableName');
           await db.execute(
-              'CREATE TABLE $_chapterTableName(manga_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
+              'CREATE TABLE $_chapterTableName(manga_id TEXT, linked_id TEXT, chapter_id TEXT, chapter_read_time INTEGER, chapter_page INTEGER, PRIMARY KEY(chapter_id))');
           await db.execute('DROP TABLE IF EXISTS $_mangaPreferencesTableName');
           await db.execute(
               'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
-        version: 7,
+        version: 8,
       );
       _initialized = true;
     }
@@ -390,11 +390,12 @@ class DBer {
     });
   }
 
-  static void readChapter(String mangaId, String chapterId, int pgNum) async {
+  static void readChapter(String mangaId, String linkedId, String chapterId, int pgNum) async {
     await _mangaDB.insert(
       _chapterTableName,
       ReadChapter.all(
         mangaId: mangaId,
+        linkedId: linkedId,
         chapterId: chapterId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
         pageNumber: pgNum,
@@ -439,6 +440,18 @@ class DBer {
     return rows.single.values.first;
   }
 
+  static Future<String> getMostRecentReadChapterByLinkedId(String linkedId) async {
+    List<Map<String, Object>> rows = await _mangaDB.query(
+      _chapterTableName,
+      columns: ['chapter_id'],
+      orderBy: 'chapter_read_time DESC',
+      where: 'linked_id = ?',
+      whereArgs: [linkedId],
+      limit: 1,
+    );
+    return rows.single.values.first;
+  }
+
   static Future<int> getLastReadPage(String chapterId) async {
     List<Map<String, Object>> rows = await _mangaDB.query(
       _chapterTableName,
@@ -472,7 +485,7 @@ class Memory {
   static void retain(CompleteManga mg) {
     if (!_manga.containsKey(mg.id)) {
       _manga[mg.id] = Chapters.all(
-          mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+          mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
       _sequence.add(mg.id);
       if (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
@@ -486,7 +499,7 @@ class Memory {
   static void retainLinked(LinkedManga mg) {
     if (!_manga.containsKey(mg.id)) {
       _manga[mg.id] = Chapters.all(
-          mangaId: mg.id, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+          mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
       _sequence.add(mg.id);
       if (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
@@ -535,14 +548,16 @@ class ReadChapter {
   String chapterId;
   int timestamp;
   String mangaId;
+  String linkedId;
   int pageNumber;
 
   ReadChapter.all(
-      {this.chapterId, this.timestamp, this.mangaId, this.pageNumber});
+      {this.chapterId, this.timestamp, this.mangaId, this.linkedId, this.pageNumber});
 
   Map<String, dynamic> toMap() {
     return {
       if (mangaId != null) 'manga_id': mangaId,
+      if (linkedId != null) 'linked_id' : linkedId,
       if (chapterId != null) 'chapter_id': chapterId,
       if (timestamp != null) 'chapter_read_time': timestamp,
       if (pageNumber != null) 'chapter_page': pageNumber,
@@ -808,13 +823,14 @@ class ChapterData {
 
 class LinkedManga {
   String id;
+  String linkedId;
   String name;
   String coverURL;
   Source source;
   Map<int, ChapterData> chapters;
 
   LinkedManga.all(
-      {this.id, this.name, this.coverURL, this.source, this.chapters});
+      {this.id, this.linkedId, this.name, this.coverURL, this.source, this.chapters});
 
   factory LinkedManga.fromJSON(Map<String, dynamic> json) {
     Map<int, ChapterData> dts = {};
@@ -824,6 +840,7 @@ class LinkedManga {
     });
     return LinkedManga.all(
       id: json["publicId"],
+      linkedId: json["linkedId"],
       name: json["name"],
       coverURL: json["coverURL"],
       source: Source.fromJSON(json["source"]),
@@ -915,11 +932,12 @@ class CompleteChapter {
 
 class Chapters {
   String mangaId;
+  String linkedId;
   Map<int, ChapterData> chaps;
   Source s;
   int currentIndex;
 
-  Chapters.all({this.mangaId, this.chaps, this.s, this.currentIndex});
+  Chapters.all({this.mangaId, this.linkedId, this.chaps, this.s, this.currentIndex});
 }
 
 class ChapterPosition {
