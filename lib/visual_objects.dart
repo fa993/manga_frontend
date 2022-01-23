@@ -341,6 +341,7 @@ class MangaPageChapterPanel extends StatefulWidget {
   final Source s;
   final int expandedIndex;
   final Function(String, int, int) onClickChapter;
+  final Function() onExpand;
 
   const MangaPageChapterPanel(
       {Key key,
@@ -348,7 +349,8 @@ class MangaPageChapterPanel extends StatefulWidget {
       this.chaps,
       this.s,
       this.expandedIndex,
-      this.onClickChapter})
+      this.onClickChapter,
+      this.onExpand})
       : super(key: key);
 
   @override
@@ -363,13 +365,12 @@ class _MangaPageChapterPanelState extends State<MangaPageChapterPanel> {
   ChapterScrollPosition _scp;
 
   void switchDisplayMode() {
-    setState(() {
-      if (this.widget.expandedIndex == _expandedIndex) {
-        _expandedIndex = -1;
-      } else {
-        _expandedIndex = this.widget.expandedIndex;
-      }
-    });
+    if (this.widget.expandedIndex == _expandedIndex) {
+      _expandedIndex = -1;
+    } else {
+      _expandedIndex = this.widget.expandedIndex;
+    }
+    this.widget.onExpand();
   }
 
   @override
@@ -794,6 +795,7 @@ class _MangaPageState extends State<MangaPage> {
               chaps: widget.manga.linkedMangas[index - 3 - 1].chapters,
               expandedIndex: index,
               onClickChapter: widget.onClickChapter,
+              onExpand: () => this.setState(() {}),
             );
           }
           switch (index) {
@@ -861,6 +863,7 @@ class _MangaPageState extends State<MangaPage> {
                 chaps: widget.manga.chapters,
                 expandedIndex: 0,
                 onClickChapter: widget.onClickChapter,
+                onExpand: () => this.setState(() {}),
               );
             default:
               return SizedBox(

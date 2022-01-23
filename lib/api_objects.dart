@@ -617,7 +617,7 @@ class MangaHeading {
 
   factory MangaHeading.fromJSON(Map<String, dynamic> json) {
     return MangaHeading.all(
-      id: json['id'],
+      id: json['publicId'],
       name: json['name'],
       coverURL: json['coverURL'],
       description: json['smallDescription'],
@@ -823,7 +823,7 @@ class LinkedManga {
       dts.putIfAbsent(chp.sequenceNumber, () => chp);
     });
     return LinkedManga.all(
-      id: json["id"],
+      id: json["publicId"],
       name: json["name"],
       coverURL: json["coverURL"],
       source: Source.fromJSON(json["source"]),
@@ -870,7 +870,7 @@ class CompleteManga {
       dts.putIfAbsent(dt.sequenceNumber, () => dt);
     });
     return CompleteManga.all(
-      id: main["id"],
+      id: main["publicId"],
       title: main["name"],
       description: main["description"],
       linkedId: main["linkedId"],
