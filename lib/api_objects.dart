@@ -489,28 +489,28 @@ class Memory {
   static String _message;
 
   static void retain(CompleteManga mg) {
-    // if (!_manga.containsKey(mg.id)) {
-    //   _manga[mg.id] = Chapters.all(
-    //       mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
-    //   _sequence.add(mg.id);
-    //   if (_sequence.length > _maxMemoryCap) {
-    //     _manga.remove(_sequence.removeAt(0));
-    //   }
-    // }
-    // mg.linkedMangas.forEach((element) {
-    //   retainLinked(element);
-    // });
+    if (!_manga.containsKey(mg.id)) {
+          _manga[mg.id] = Chapters.all(
+              mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+          _sequence.add(mg.id);
+          if (_sequence.length > _maxMemoryCap) {
+            _manga.remove(_sequence.removeAt(0));
+          }
+        }
+        mg.linkedMangas.forEach((element) {
+          retainLinked(element);
+        });
   }
 
   static void retainLinked(LinkedManga mg) {
-    // if (!_manga.containsKey(mg.id)) {
-    //   _manga[mg.id] = Chapters.all(
-    //       mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
-    //   _sequence.add(mg.id);
-    //   if (_sequence.length > _maxMemoryCap) {
-    //     _manga.remove(_sequence.removeAt(0));
-    //   }
-    // }
+    if (!_manga.containsKey(mg.id)) {
+      _manga[mg.id] = Chapters.all(
+          mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+      _sequence.add(mg.id);
+      if (_sequence.length > _maxMemoryCap) {
+        _manga.remove(_sequence.removeAt(0));
+      }
+    }
   }
 
   static Chapters remember(String mangaId, int index) {
