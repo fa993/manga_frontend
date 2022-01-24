@@ -11,7 +11,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
-import 'package:provider/provider.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
