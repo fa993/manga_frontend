@@ -804,7 +804,8 @@ class _MangaPageState extends State<MangaPage> {
               widget.manga.title,
               widget.manga.coverURL,
               widget.manga.description,
-              MangaPage.genresToString(widget.manga.genres)).then((value) => _isSaved.value = true);
+              MangaPage.genresToString(widget.manga.genres))
+          .then((value) => _isSaved.value = true);
     } else {
       FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.linkedId);
       DBer.removeManga(widget.manga.id).then((value) => _isSaved.value = false);
@@ -858,11 +859,10 @@ class _MangaPageState extends State<MangaPage> {
                 children: [
                   ValueListenableBuilder(
                     valueListenable: _isSaved,
-                    builder: (context, val, child) =>
-                      FavouriteButton(
-                        isFavourite: val,
-                        onToggleFavourite: this.onToggleFavourite,
-                      ),
+                    builder: (context, val, child) => FavouriteButton(
+                      isFavourite: val,
+                      onToggleFavourite: this.onToggleFavourite,
+                    ),
                   ),
                   SizedBox(
                     width: 30,
@@ -1071,32 +1071,45 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
 class ReaderPageInfoPanel extends StatelessWidget {
   static final intl.DateFormat _formatter = intl.DateFormat.jm();
 
-  final DateTime date;
-  final int battery;
+  final Stream<ReaderInfo> infoStream;
   final int pageNum;
   final int chapLength;
 
   const ReaderPageInfoPanel(
-      {Key key, this.date, this.battery, this.pageNum, this.chapLength})
+      {Key key, this.infoStream, this.pageNum, this.chapLength})
       : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
-      color: Colors.black54,
-      child: Text(
-        ((date == null ? "?" : _formatter.format(date)) +
-                " Battery: " +
-                (battery == null ? "?" : battery.toString()) +
-                "% " +
-                (pageNum == null || chapLength == null
-                    ? "?/?"
-                    : pageNum.toString() + "/" + chapLength.toString()))
-            .trim(),
-        style: TextStyle(color: Colors.white),
-      ),
-    );
+        padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
+        color: Colors.black54,
+        child: StreamBuilder<ReaderInfo>(
+          stream: infoStream,
+          initialData: ReaderInfo(null, null),
+          builder: (context, snapshot) {
+            DateTime date;
+            int battery;
+            if (!snapshot.hasData) {
+              date = null;
+              battery = null;
+            } else {
+              date = snapshot.data.time;
+              battery = snapshot.data.battery;
+            }
+            return Text(
+              ((date == null ? "?" : _formatter.format(date)) +
+                      " Battery: " +
+                      (battery == null ? "?" : battery.toString()) +
+                      "% " +
+                      (pageNum == null || chapLength == null
+                          ? "?/?"
+                          : pageNum.toString() + "/" + chapLength.toString()))
+                  .trim(),
+              style: TextStyle(color: Colors.white),
+            );
+          },
+        ));
   }
 }
 
@@ -1260,4 +1273,52 @@ class ChapterScrollPosition {
   int index;
 
   ChapterScrollPosition({this.index});
+}
+
+class ReaderInfo {
+  final DateTime time;
+  final int battery;
+
+  const ReaderInfo(this.time, this.battery);
+}
+
+class CompleteReaderInfo extends ChangeNotifier {
+  StreamSubscription<DateTime> _dateSub;
+  StreamSubscription<int> _batSub;
+
+  DateTime current;
+  int battery;
+  int chapPage;
+  int chapLen;
+
+  CompleteReaderInfo(Stream<DateTime> dateStream, Stream<int> batStream,
+      this.chapPage, this.chapLen) {
+    _dateSub = dateStream.listen((event) {
+      current = event;
+      notifyListeners();
+    });
+    _batSub = batStream.listen((event) {
+      battery = event;
+      notifyListeners();
+    });
+    chapPage = chapPage;
+    chapLen = chapLen;
+  }
+
+  setChapPage(int newPage) {
+    this.chapPage = newPage;
+    notifyListeners();
+  }
+
+  setChapLen(int newChapLen) {
+    this.chapLen = newChapLen;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _dateSub.cancel();
+    _batSub.cancel();
+  }
 }
