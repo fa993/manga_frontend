@@ -203,7 +203,8 @@ class DBer {
 
   static bool _initialized = false;
 
-  static SavedMangaTable _savedTable = SavedMangaTable(null);
+  static SavedMangaTable _permanentModel;
+  static List<SavedManga> _savedMangaModel;
   static ValueNotifier<LastReadChapter> _notifierForChapter;
 
   static Database _mangaDB;
@@ -246,7 +247,8 @@ class DBer {
       );
       _initialized = true;
     }
-    _savedTable = SavedMangaTable(await DBer.getAllSavedMangaAsync());
+    _savedMangaModel = (await DBer.getAllSavedMangaAsync()).toList();
+    _permanentModel = SavedMangaTable.fromList(_savedMangaModel);
   }
 
   static void registerNotifierForChapter(
@@ -330,7 +332,9 @@ class DBer {
         description: description,
         allGenres: allGenres,
       );
-      _savedTable.addManga(m);
+      if(_permanentModel != null) {
+        _permanentModel.addManga(m);
+      }
       await txn.insert(
         _savedMangaTableName,
         m.toMap(),
@@ -346,7 +350,9 @@ class DBer {
       where: 'saved_manga_id = ?',
       whereArgs: [id],
     );
-    _savedTable.removeManga(id);
+    if(_permanentModel != null) {
+      _permanentModel.removeManga(id);
+    }
     return null;
   }
 
@@ -382,7 +388,9 @@ class DBer {
       await txn.rawUpdate(
           'UPDATE $_savedMangaTableName set manga_index = ? where saved_manga_id = ?',
           [index2, id1]);
-      _savedTable.reorder(id1, id2);
+      if(_permanentModel != null) {
+        _permanentModel.reorder(id1, id2);
+      }
     });
   }
 
@@ -475,7 +483,7 @@ class DBer {
   }
 
   static SavedMangaTable getTable() {
-    return _savedTable;
+    return _permanentModel.createNotifier();
   }
 }
 
@@ -635,34 +643,89 @@ class SavedManga extends MangaHeading {
 
 class SavedMangaTable extends ChangeNotifier {
 
-  List<SavedManga> _list = [];
+  static final _uuid = uuid.Uuid();
 
-  SavedMangaTable(Iterable<SavedManga> m) {
+  String _id;
+
+  List<SavedManga> _list;
+  bool _disposed = false;
+  SavedMangaTable _parent;
+  List<SavedMangaTable> _childs = [];
+
+  SavedMangaTable() {
+    this._id = _uuid.v1();
+  }
+
+
+  SavedMangaTable.fromList(List<SavedManga> m) {
+    this._list = m;
+  }
+
+  SavedMangaTable.fromIterable(Iterable<SavedManga> m) {
     this._list = m.toList();
   }
 
   addManga(SavedManga m) {
-    this._list.add(m);
-    notifyListeners();
+    if(this._list != null) {
+      this._list.add(m);
+      doNotifyListeners();
+    }
   }
 
   removeManga(String id) {
-    this._list.removeWhere((element) => element.id == id);
-    notifyListeners();
+    if(this._list != null) {
+      this._list.removeWhere((element) => element.id == id);
+      doNotifyListeners();
+    }
   }
 
   reorder(String id1, String id2) {
-    SavedManga m = this._list.firstWhere((element) => element.id == id1);
-    SavedManga m2 = this._list.firstWhere((element) => element.id == id2);
-    int tmp = m.index;
-    m.index = m2.index;
-    m2.index = m.index;
+    if(this._list != null) {
+      SavedManga m = this._list.firstWhere((element) => element.id == id1);
+      SavedManga m2 = this._list.firstWhere((element) => element.id == id2);
+      int tmp = m.index;
+      m.index = m2.index;
+      m2.index = tmp;
+    }
   }
 
   List<SavedManga> get getList {
     return this._list;
   }
+  
+  void doDispose() {
+    this._disposed = true;
+    if(this._parent != null) {
+      this._parent._childs.remove(this);
+    }
+    this.dispose();
+  }
+  
+  bool get isDisposed {
+    return this._disposed;
+  }
 
+  SavedMangaTable createNotifier() {
+    SavedMangaTable tb = SavedMangaTable.fromList(this._list);
+    this._childs.add(tb);
+    tb._parent = this;
+    return tb;
+  }
+
+  void doNotifyListeners() {
+    this._childs.forEach((t) {
+      if(!t.isDisposed) {
+          t.notifyListeners();
+      }
+    });
+    this.notifyListeners();
+  }
+
+  @override
+  bool operator ==(Object other) => identical(this, other) || other is SavedMangaTable && runtimeType == other.runtimeType && _id == other._id;
+
+  @override
+  int get hashCode => _id.hashCode;
 }
 
 class MangaHeading {

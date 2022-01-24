@@ -757,7 +757,7 @@ class _MangaPageState extends State<MangaPage> {
 
   ValueNotifier<LastReadChapter> _notifier;
 
-  ValueNotifier<bool> _isSaved;
+  ValueNotifier<bool> _isSaved = ValueNotifier(null);
 
   ChapterSlice toSlice(LastReadChapter chap) {
     MapEntry<int, ChapterData> ans;
@@ -870,7 +870,7 @@ class _MangaPageState extends State<MangaPage> {
                   ValueListenableBuilder(
                       valueListenable: _notifier,
                       builder: (context, val, child) => LastReadChapterButton(
-                            readChapter: val,
+                            readChapter: this.toSlice(val),
                             onClickReadChapter: this.onClickReadChapter,
                           ))
                 ],
