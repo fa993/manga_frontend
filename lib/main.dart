@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
+import 'package:provider/provider.dart';
 import 'package:reorderables/reorderables.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -84,6 +85,13 @@ class AppHome extends StatefulWidget {
 
 class _AppHomeState extends State<AppHome> {
   // This widget is the root of your application.
+
+  @override
+  void initState() {
+    super.initState();
+    DBer.initializeDatabase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
@@ -107,6 +115,7 @@ class _AppHomeState extends State<AppHome> {
       ),
     );
   }
+
 }
 
 class LostPage extends StatelessWidget {
@@ -849,16 +858,11 @@ class FavouritesPageWidget extends StatefulWidget {
 }
 
 class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
-  final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
   double boxSide;
 
   @override
   void initState() {
     super.initState();
-    DBer.registerNotifierForFavourites(_notifier);
-    DBer.initializeDatabase().then((value) {
-      _notifier.value += 1;
-    });
   }
 
   @override
@@ -895,6 +899,8 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
     return renderedManga;
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -916,37 +922,34 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         child: SingleChildScrollView(
           child: Container(
             padding: EdgeInsets.all(16.0),
-            child: ValueListenableBuilder<int>(
-              valueListenable: _notifier,
-              builder: (context, junk, child) {
-                return FutureBuilder(
-                  future: DBer.getAllSavedMangaAsync(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      List<Widget> renderedManga = [];
-                      List<SavedManga> savedManga = [];
-                      parse(snapshot.data, renderedManga, savedManga);
-                      return ReorderableWrap(
-                        needsLongPressDraggable: false,
-                        spacing: 16.0,
-                        children: renderedManga,
-                        maxMainAxisCount: 3,
-                        minMainAxisCount: 3,
-                        runSpacing: 16.0,
-                        onReorder: (from, to) {
-                          String id1 = savedManga[from].id;
-                          String id2 = savedManga[to].id;
-                          _move(from, to, savedManga);
-                          _move(from, to, renderedManga);
-                          DBer.reorder(id1, id2);
-                        },
-                      );
-                    } else {
-                      return CenteredFixedCircle();
-                    }
-                  },
-                );
-              },
+            child: ChangeNotifierProvider(
+              create: (context) => DBer.getTable(),
+              child: Consumer<SavedMangaTable>(
+                builder: (context, val, child) {
+                  if (val != null) {
+                    List<Widget> renderedManga = [];
+                    List<SavedManga> savedManga = [];
+                    parse(val.getList, renderedManga, savedManga);
+                    return ReorderableWrap(
+                      needsLongPressDraggable: false,
+                      spacing: 16.0,
+                      children: renderedManga,
+                      maxMainAxisCount: 3,
+                      minMainAxisCount: 3,
+                      runSpacing: 16.0,
+                      onReorder: (from, to) {
+                        String id1 = savedManga[from].id;
+                        String id2 = savedManga[to].id;
+                        _move(from, to, savedManga);
+                        _move(from, to, renderedManga);
+                        DBer.reorder(id1, id2);
+                      },
+                    );
+                  } else {
+                    return CenteredFixedCircle();
+                  }
+                }
+              ),
             ),
           ),
         ),
@@ -1360,8 +1363,8 @@ class _ReaderWidgetState extends State<ReaderWidget>
       currNum = this.widget.lastSave;
     }
     _currIndex = currNum;
-    DBer.readChapter(
-        _current.mangaId, _current.linkedId, _current.chaps[_current.currentIndex].id, currNum);
+    DBer.readChapter(_current.mangaId, _current.linkedId,
+        _current.chaps[_current.currentIndex].id, currNum);
     _formalIndexAtStartOfCurrentChapter = (pgNum);
     _formalIndexForList = _formalIndexAtStartOfCurrentChapter + currNum;
     PageController pageController = PageController(
@@ -1398,7 +1401,8 @@ class _ReaderWidgetState extends State<ReaderWidget>
     int nIn = nCurr - 1;
     if (_currentChapterId != _current.chaps[chapIndex].id) {
       _currentChapterId = _current.chaps[chapIndex].id;
-      DBer.readChapter(_current.mangaId, _current.linkedId, _currentChapterId, nIn);
+      DBer.readChapter(
+          _current.mangaId, _current.linkedId, _currentChapterId, nIn);
     }
     if (nIn != _currIndex) {
       _currIndex = nIn;

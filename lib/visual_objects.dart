@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:core';
+import 'dart:core';
 import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -230,98 +233,80 @@ class MangaPageGenres extends StatelessWidget {
   }
 }
 
-class MangaPageButtonPanel extends StatelessWidget {
-  final Future<bool> isFavourite;
+class FavouriteButton extends StatelessWidget {
+  final bool isFavourite;
   final Function(bool) onToggleFavourite;
-  final Future<ChapterSlice> readChapter;
-  final Function(String, int) onClickReadChapter;
 
-  const MangaPageButtonPanel(
-      {Key key,
-      this.isFavourite,
-      this.onToggleFavourite,
-      this.readChapter,
-      this.onClickReadChapter})
+  const FavouriteButton({Key key, this.isFavourite, this.onToggleFavourite})
       : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FutureBuilder(
-          future: isFavourite,
-          builder: (context, snapshot) {
-            Function onP;
-            Widget chi;
-            if (snapshot.hasData) {
-              onP = () => onToggleFavourite.call(snapshot.data);
-              chi = Icon(snapshot.data
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded);
-            } else if (snapshot.hasError) {
-              onP = () {};
-              chi = Icon(Icons.error);
-            } else {
-              onP = () {};
-              chi = Icon(Icons.alarm_rounded);
-            }
-            return OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                side: BorderSide(
-                  color: Colors.green,
-                  width: 2.0,
-                ),
-              ),
-              onPressed: onP,
-              child: chi,
-            );
-          },
+    Function onP;
+    Widget chi;
+    if (isFavourite != null) {
+      onP = () => onToggleFavourite.call(isFavourite);
+      chi = Icon(
+          isFavourite ? Icons.favorite_rounded : Icons.favorite_border_rounded);
+    } else {
+      onP = () {};
+      chi = Icon(Icons.error);
+    }
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(2),
         ),
-        SizedBox(
-          width: 30,
+        side: BorderSide(
+          color: Colors.green,
+          width: 2.0,
         ),
-        FutureBuilder(
-          future: readChapter,
-          builder: (context, snapshot) {
-            Function onP;
-            String tex;
-            if (snapshot.hasData) {
-              onP = () => onClickReadChapter.call(
-                  snapshot.data.mangaId, snapshot.data.chapterIndex);
-              tex = snapshot.data.displayText;
-            } else if (snapshot.hasError) {
-              print(snapshot.error);
-              onP = () {};
-              tex = "Err";
-            } else {
-              onP = () {};
-              tex = "...";
-            }
-            return OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                side: BorderSide(
-                  color: Colors.green,
-                  width: 2.0,
-                ),
-              ),
-              onPressed: onP,
-              child: Text(
-                tex,
-                style: TextStyle(
-                  color: Colors.white,
-                ),
-              ),
-            );
-          },
+      ),
+      onPressed: onP,
+      child: chi,
+    );
+  }
+}
+
+class LastReadChapterButton extends StatelessWidget {
+  final ChapterSlice readChapter;
+  final Function(String, int) onClickReadChapter;
+
+  const LastReadChapterButton(
+      {Key key, this.readChapter, this.onClickReadChapter})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Function onP;
+    String tex;
+    if (readChapter.mangaId == null ||
+        readChapter.chapterIndex == null ||
+        readChapter.displayText == null) {
+      onP = () {};
+      tex = "...";
+    } else {
+      onP = () => onClickReadChapter.call(
+          readChapter.mangaId, readChapter.chapterIndex);
+      tex = readChapter.displayText;
+    }
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(2),
         ),
-      ],
+        side: BorderSide(
+          color: Colors.green,
+          width: 2.0,
+        ),
+      ),
+      onPressed: onP,
+      child: Text(
+        tex,
+        style: TextStyle(
+          color: Colors.white,
+        ),
+      ),
     );
   }
 }
@@ -768,14 +753,75 @@ class MangaPage extends StatefulWidget {
 }
 
 class _MangaPageState extends State<MangaPage> {
-  final ValueNotifier<int> _notifier = ValueNotifier<int>(0);
+  static final LinkedManga _defaultManga = LinkedManga.all(chapters: Map());
 
-  bool _isSaved;
+  ValueNotifier<LastReadChapter> _notifier;
+
+  ValueNotifier<bool> _isSaved;
+
+  ChapterSlice toSlice(LastReadChapter chap) {
+    MapEntry<int, ChapterData> ans;
+    if (chap.mangaId == null || chap.chapterId == null) {
+      return ChapterSlice.all(null, null, null);
+    }
+    if (widget.manga.id == chap.mangaId) {
+      ans = widget.manga.chapters.entries.firstWhere(
+          (element) => element.value.id == chap.chapterId,
+          orElse: () => null);
+    } else {
+      ans = widget.manga.linkedMangas
+          .firstWhere((element) => element.id == chap.mangaId,
+              orElse: () => _defaultManga)
+          .chapters
+          .entries
+          .firstWhere((element) => element.value.id == chap.chapterId,
+              orElse: () => null);
+    }
+    if (ans != null) {
+      return ChapterSlice.all(
+          MangaPageChapterPanel.chapterToDisplayString(ans.value),
+          ans.key,
+          chap.mangaId);
+    } else {
+      return ChapterSlice.all(
+          MangaPageChapterPanel.chapterToDisplayString(
+              widget.manga.chapters[0]),
+          0,
+          widget.manga.id);
+    }
+  }
+
+  onClickReadChapter(String mId, int t) {
+    widget.onClickChapter.call(mId, t, null);
+    // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
+  }
+
+  void onToggleFavourite(bool b) {
+    if (!b) {
+      FirebaseMessaging.instance.subscribeToTopic(widget.manga.linkedId);
+      DBer.saveManga(
+              widget.manga.id,
+              widget.manga.title,
+              widget.manga.coverURL,
+              widget.manga.description,
+              MangaPage.genresToString(widget.manga.genres)).then((value) => _isSaved.value = true);
+    } else {
+      FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.linkedId);
+      DBer.removeManga(widget.manga.id).then((value) => _isSaved.value = false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _notifier = ValueNotifier<LastReadChapter>(
+        LastReadChapter(mangaId: null, chapterId: null));
+    DBer.getMostRecentReadChapterByLinkedId(widget.manga.linkedId)
+        .then((val) => _notifier.value = val)
+        .onError((error, stackTrace) => _notifier.value = LastReadChapter(
+            mangaId: widget.manga.id, chapterId: widget.manga.chapters[0].id));
     DBer.registerNotifierForChapter(_notifier);
+    DBer.isSaved(widget.manga.id).then((value) => _isSaved.value = value);
     Memory.retain(this.widget.manga);
   }
 
@@ -807,83 +853,27 @@ class _MangaPageState extends State<MangaPage> {
                   description: widget.manga.description);
             case 2:
               //TODO encapsulate this outside.. ideally you don't want any api call in this library/file
-              //TODO use change notifier here
-              return ValueListenableBuilder<int>(
-                valueListenable: _notifier,
-                builder: (context, junk, child) {
-                  return MangaPageButtonPanel(
-                    isFavourite: _isSaved == null
-                        ? DBer.isSaved(widget.manga.id)
-                        : Future.value(_isSaved),
-                    onToggleFavourite: (b) {
-                      if (!b) {
-                        FirebaseMessaging.instance
-                            .subscribeToTopic(widget.manga.linkedId);
-                        DBer.saveManga(
-                                widget.manga.id,
-                                widget.manga.title,
-                                widget.manga.coverURL,
-                                widget.manga.description,
-                                MangaPage.genresToString(widget.manga.genres))
-                            .then((value) => setState(() => _isSaved = true));
-                      } else {
-                        FirebaseMessaging.instance
-                            .unsubscribeFromTopic(widget.manga.linkedId);
-                        DBer.removeManga(widget.manga.id)
-                            .then((value) => setState(() => _isSaved = false));
-                      }
-                    },
-                    readChapter: DBer.getMostRecentReadChapterByLinkedId(
-                            widget.manga.linkedId)
-                        .then((value) {
-                      String mId;
-                      MapEntry<int, ChapterData> match;
-                      for (MapEntry<int, ChapterData> ent
-                          in widget.manga.chapters.entries) {
-                        if (ent.value.id == value) {
-                          match = ent;
-                          mId = widget.manga.id;
-                          break;
-                        }
-                      }
-                      for (int i = 0;
-                          i < widget.manga.linkedMangas.length && match == null;
-                          i++) {
-                        for (MapEntry<int, ChapterData> ent
-                            in widget.manga.linkedMangas[i].chapters.entries) {
-                          if (ent.value.id == value) {
-                            match = ent;
-                            mId = widget.manga.linkedMangas[i].id;
-                            break;
-                          }
-                        }
-                      }
-                      if (match == null) {
-                        return ChapterSlice.all(
-                            MangaPageChapterPanel.chapterToDisplayString(
-                                widget.manga.chapters[0]),
-                            0,
-                            widget.manga.id);
-                      } else {
-                        return ChapterSlice.all(
-                            MangaPageChapterPanel.chapterToDisplayString(
-                                match.value),
-                            match.key,
-                            mId);
-                      }
-                    }, onError: (t) {
-                      return ChapterSlice.all(
-                          MangaPageChapterPanel.chapterToDisplayString(
-                              widget.manga.chapters[0]),
-                          0,
-                          widget.manga.id);
-                    }),
-                    onClickReadChapter: (mId, t) {
-                      widget.onClickChapter.call(mId, t, null);
-                      // MangaPageChapterPanel.onClick.call(context, Chapters.all(mangaId: widget.manga.id, chaps: widget.manga.chapters, currentIndex: t, s: widget.manga.source), widget.pushCallback);
-                    },
-                  );
-                },
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ValueListenableBuilder(
+                    valueListenable: _isSaved,
+                    builder: (context, val, child) =>
+                      FavouriteButton(
+                        isFavourite: val,
+                        onToggleFavourite: this.onToggleFavourite,
+                      ),
+                  ),
+                  SizedBox(
+                    width: 30,
+                  ),
+                  ValueListenableBuilder(
+                      valueListenable: _notifier,
+                      builder: (context, val, child) => LastReadChapterButton(
+                            readChapter: val,
+                            onClickReadChapter: this.onClickReadChapter,
+                          ))
+                ],
               );
             case 3:
               return MangaPageChapterPanel(

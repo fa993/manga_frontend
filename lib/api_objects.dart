@@ -203,8 +203,8 @@ class DBer {
 
   static bool _initialized = false;
 
-  static ValueNotifier<int> _notifierForFavourites;
-  static ValueNotifier<int> _notifierForChapter;
+  static SavedMangaTable _savedTable = SavedMangaTable(null);
+  static ValueNotifier<LastReadChapter> _notifierForChapter;
 
   static Database _mangaDB;
 
@@ -246,16 +246,11 @@ class DBer {
       );
       _initialized = true;
     }
+    _savedTable = SavedMangaTable(await DBer.getAllSavedMangaAsync());
   }
 
-  static void registerNotifierForFavourites(ValueNotifier<int> notifier) {
-    if (_notifierForFavourites != null) {
-      _notifierForFavourites.dispose();
-    }
-    _notifierForFavourites = notifier;
-  }
-
-  static void registerNotifierForChapter(ValueNotifier<int> notifier) {
+  static void registerNotifierForChapter(
+      ValueNotifier<LastReadChapter> notifier) {
     if (_notifierForChapter != null) {
       _notifierForChapter.dispose();
     }
@@ -309,7 +304,7 @@ class DBer {
         },
       );
     } else {
-      return null;
+      return Iterable.empty();
     }
   }
 
@@ -327,22 +322,21 @@ class DBer {
       } else {
         index = 0;
       }
+      SavedManga m = SavedManga.all(
+        id: id,
+        name: name,
+        coverURL: coverURL,
+        index: index,
+        description: description,
+        allGenres: allGenres,
+      );
+      _savedTable.addManga(m);
       await txn.insert(
         _savedMangaTableName,
-        SavedManga.all(
-          id: id,
-          name: name,
-          coverURL: coverURL,
-          index: index,
-          description: description,
-          allGenres: allGenres,
-        ).toMap(),
+        m.toMap(),
         conflictAlgorithm: ConflictAlgorithm.rollback,
       );
     });
-    if(_notifierForFavourites != null) {
-      _notifierForFavourites.value += 1;
-    }
     return null;
   }
 
@@ -352,18 +346,15 @@ class DBer {
       where: 'saved_manga_id = ?',
       whereArgs: [id],
     );
-    if(_notifierForFavourites != null) {
-      _notifierForFavourites.value += 1;
-    }
+    _savedTable.removeManga(id);
     return null;
   }
 
   static Future<bool> isSaved(String id) async {
     return Sqflite.firstIntValue(await _mangaDB.rawQuery(
           'SELECT EXISTS(SELECT 1 from $_savedMangaTableName WHERE saved_manga_id = ?)',
-          [id],
-        )) ==
-        1;
+          [id],))
+        == 1;
   }
 
   static void reorder(String id1, String id2) {
@@ -391,10 +382,12 @@ class DBer {
       await txn.rawUpdate(
           'UPDATE $_savedMangaTableName set manga_index = ? where saved_manga_id = ?',
           [index2, id1]);
+      _savedTable.reorder(id1, id2);
     });
   }
 
-  static void readChapter(String mangaId, String linkedId, String chapterId, int pgNum) async {
+  static void readChapter(
+      String mangaId, String linkedId, String chapterId, int pgNum) async {
     await _mangaDB.insert(
       _chapterTableName,
       ReadChapter.all(
@@ -406,8 +399,9 @@ class DBer {
       ).toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    if(_notifierForChapter != null) {
-      _notifierForChapter.value += 1;
+    if (_notifierForChapter != null) {
+      _notifierForChapter.value =
+          LastReadChapter(mangaId: mangaId, chapterId: chapterId);
     }
   }
 
@@ -446,16 +440,18 @@ class DBer {
     return rows.single.values.first;
   }
 
-  static Future<String> getMostRecentReadChapterByLinkedId(String linkedId) async {
+  static Future<LastReadChapter> getMostRecentReadChapterByLinkedId(
+      String linkedId) async {
     List<Map<String, Object>> rows = await _mangaDB.query(
       _chapterTableName,
-      columns: ['chapter_id'],
+      columns: ['manga_id', 'chapter_id'],
       orderBy: 'chapter_read_time DESC',
       where: 'linked_id = ?',
       whereArgs: [linkedId],
       limit: 1,
     );
-    return rows.single.values.first;
+    Iterable x = rows.single.values;
+    return LastReadChapter(mangaId: x.elementAt(0), chapterId: x.elementAt(1));
   }
 
   static Future<int> getLastReadPage(String chapterId) async {
@@ -477,6 +473,10 @@ class DBer {
     );
     return Sqflite.firstIntValue(rows);
   }
+
+  static SavedMangaTable getTable() {
+    return _savedTable;
+  }
 }
 
 class Memory {
@@ -490,22 +490,30 @@ class Memory {
 
   static void retain(CompleteManga mg) {
     if (!_manga.containsKey(mg.id)) {
-          _manga[mg.id] = Chapters.all(
-              mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
-          _sequence.add(mg.id);
-          if (_sequence.length > _maxMemoryCap) {
-            _manga.remove(_sequence.removeAt(0));
-          }
-        }
-        mg.linkedMangas.forEach((element) {
-          retainLinked(element);
-        });
+      _manga[mg.id] = Chapters.all(
+          mangaId: mg.id,
+          linkedId: mg.linkedId,
+          chaps: mg.chapters,
+          currentIndex: -1,
+          s: mg.source);
+      _sequence.add(mg.id);
+      if (_sequence.length > _maxMemoryCap) {
+        _manga.remove(_sequence.removeAt(0));
+      }
+    }
+    mg.linkedMangas.forEach((element) {
+      retainLinked(element);
+    });
   }
 
   static void retainLinked(LinkedManga mg) {
     if (!_manga.containsKey(mg.id)) {
       _manga[mg.id] = Chapters.all(
-          mangaId: mg.id, linkedId: mg.linkedId, chaps: mg.chapters, currentIndex: -1, s: mg.source);
+          mangaId: mg.id,
+          linkedId: mg.linkedId,
+          chaps: mg.chapters,
+          currentIndex: -1,
+          s: mg.source);
       _sequence.add(mg.id);
       if (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
@@ -559,12 +567,16 @@ class ReadChapter {
   int pageNumber;
 
   ReadChapter.all(
-      {this.chapterId, this.timestamp, this.mangaId, this.linkedId, this.pageNumber});
+      {this.chapterId,
+      this.timestamp,
+      this.mangaId,
+      this.linkedId,
+      this.pageNumber});
 
   Map<String, dynamic> toMap() {
     return {
       if (mangaId != null) 'manga_id': mangaId,
-      if (linkedId != null) 'linked_id' : linkedId,
+      if (linkedId != null) 'linked_id': linkedId,
       if (chapterId != null) 'chapter_id': chapterId,
       if (timestamp != null) 'chapter_read_time': timestamp,
       if (pageNumber != null) 'chapter_page': pageNumber,
@@ -619,6 +631,38 @@ class SavedManga extends MangaHeading {
 
   @override
   int get hashCode => this.id.hashCode;
+}
+
+class SavedMangaTable extends ChangeNotifier {
+
+  List<SavedManga> _list = [];
+
+  SavedMangaTable(Iterable<SavedManga> m) {
+    this._list = m.toList();
+  }
+
+  addManga(SavedManga m) {
+    this._list.add(m);
+    notifyListeners();
+  }
+
+  removeManga(String id) {
+    this._list.removeWhere((element) => element.id == id);
+    notifyListeners();
+  }
+
+  reorder(String id1, String id2) {
+    SavedManga m = this._list.firstWhere((element) => element.id == id1);
+    SavedManga m2 = this._list.firstWhere((element) => element.id == id2);
+    int tmp = m.index;
+    m.index = m2.index;
+    m2.index = m.index;
+  }
+
+  List<SavedManga> get getList {
+    return this._list;
+  }
+
 }
 
 class MangaHeading {
@@ -837,7 +881,12 @@ class LinkedManga {
   Map<int, ChapterData> chapters;
 
   LinkedManga.all(
-      {this.id, this.linkedId, this.name, this.coverURL, this.source, this.chapters});
+      {this.id,
+      this.linkedId,
+      this.name,
+      this.coverURL,
+      this.source,
+      this.chapters});
 
   factory LinkedManga.fromJSON(Map<String, dynamic> json) {
     Map<int, ChapterData> dts = {};
@@ -944,7 +993,8 @@ class Chapters {
   Source s;
   int currentIndex;
 
-  Chapters.all({this.mangaId, this.linkedId, this.chaps, this.s, this.currentIndex});
+  Chapters.all(
+      {this.mangaId, this.linkedId, this.chaps, this.s, this.currentIndex});
 }
 
 class ChapterPosition {
@@ -959,4 +1009,22 @@ class ChapterPosition {
       length: json['length'],
     );
   }
+}
+
+class LastReadChapter {
+  final String mangaId;
+  final String chapterId;
+
+  const LastReadChapter({this.mangaId, this.chapterId});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LastReadChapter &&
+          runtimeType == other.runtimeType &&
+          mangaId == other.mangaId &&
+          chapterId == other.chapterId;
+
+  @override
+  int get hashCode => mangaId.hashCode ^ chapterId.hashCode;
 }
