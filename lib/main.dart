@@ -1809,13 +1809,13 @@ class _ReaderWidgetState extends State<ReaderWidget>
                       },
                     ),
               Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child:  SafeArea(
-                          child:Consumer<CompleteReaderInfo>(
-                        builder: (context, info, child) =>
-                            ReaderPageInfoPanel(info),
-                      ))),
+                  bottom: 0,
+                  right: 0,
+                  child: SafeArea(
+                      child: Consumer<CompleteReaderInfo>(
+                    builder: (context, info, child) =>
+                        ReaderPageInfoPanel(info),
+                  ))),
             ],
           ),
         ),
