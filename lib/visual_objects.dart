@@ -1068,15 +1068,58 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
   }
 }
 
+// class ReaderPageInfoPanel extends StatelessWidget {
+//   static final intl.DateFormat _formatter = intl.DateFormat.jm();
+//
+//   final Stream<ReaderInfo> infoStream;
+//   final int pageNum;
+//   final int chapLength;
+//
+//   const ReaderPageInfoPanel(
+//       {Key key, this.infoStream, this.pageNum, this.chapLength})
+//       : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//         padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
+//         color: Colors.black54,
+//         child: StreamBuilder<ReaderInfo>(
+//           stream: infoStream,
+//           initialData: ReaderInfo(null, null),
+//           builder: (context, snapshot) {
+//             DateTime date;
+//             int battery;
+//             if (!snapshot.hasData) {
+//               date = null;
+//               battery = null;
+//             } else {
+//               date = snapshot.data.time;
+//               battery = snapshot.data.battery;
+//             }
+//             return Text(
+//               ((date == null ? "?" : _formatter.format(date)) +
+//                       " Battery: " +
+//                       (battery == null ? "?" : battery.toString()) +
+//                       "% " +
+//                       (pageNum == null || chapLength == null
+//                           ? "?/?"
+//                           : pageNum.toString() + "/" + chapLength.toString()))
+//                   .trim(),
+//               style: TextStyle(color: Colors.white),
+//             );
+//           },
+//         ));
+//   }
+// }
+
+
 class ReaderPageInfoPanel extends StatelessWidget {
   static final intl.DateFormat _formatter = intl.DateFormat.jm();
 
-  final Stream<ReaderInfo> infoStream;
-  final int pageNum;
-  final int chapLength;
+  final CompleteReaderInfo info;
 
-  const ReaderPageInfoPanel(
-      {Key key, this.infoStream, this.pageNum, this.chapLength})
+  const ReaderPageInfoPanel(this.info, {Key key})
       : super(key: key);
 
   @override
@@ -1084,34 +1127,21 @@ class ReaderPageInfoPanel extends StatelessWidget {
     return Container(
         padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
         color: Colors.black54,
-        child: StreamBuilder<ReaderInfo>(
-          stream: infoStream,
-          initialData: ReaderInfo(null, null),
-          builder: (context, snapshot) {
-            DateTime date;
-            int battery;
-            if (!snapshot.hasData) {
-              date = null;
-              battery = null;
-            } else {
-              date = snapshot.data.time;
-              battery = snapshot.data.battery;
-            }
-            return Text(
-              ((date == null ? "?" : _formatter.format(date)) +
-                      " Battery: " +
-                      (battery == null ? "?" : battery.toString()) +
-                      "% " +
-                      (pageNum == null || chapLength == null
-                          ? "?/?"
-                          : pageNum.toString() + "/" + chapLength.toString()))
+        child: Text(
+              ((info.current == null ? "?" : _formatter.format(info.current)) +
+                  " Battery: " +
+                  (info.battery == null ? "?" : info.battery.toString()) +
+                  "% " +
+                  (info.chapPage == null || info.chapLen == null
+                      ? "?/?"
+                      : info.chapPage.toString() + "/" + info.chapLen.toString()))
                   .trim(),
               style: TextStyle(color: Colors.white),
-            );
-          },
-        ));
+            )
+        );
   }
 }
+
 
 class SideWheel extends CustomPainter {
   static const double length = 10;
