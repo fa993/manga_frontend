@@ -243,7 +243,7 @@ class DBer {
           await db.execute(
               'CREATE TABLE $_mangaPreferencesTableName(manga_id TEXT, scroll_style INTEGER, PRIMARY KEY(manga_id))');
         },
-        version: 10,
+        version: 12,
       );
       _initialized = true;
     }
