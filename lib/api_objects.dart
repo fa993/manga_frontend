@@ -516,17 +516,21 @@ class Memory {
 
   static void retainLinked(LinkedManga mg) {
     if (!_manga.containsKey(mg.id)) {
-      _manga[mg.id] = Chapters.all(
-          mangaId: mg.id,
-          linkedId: mg.linkedId,
-          chaps: mg.chapters,
-          currentIndex: -1,
-          s: mg.source);
-      _sequence.add(mg.id);
-      if (_sequence.length > _maxMemoryCap) {
+      retainLinkedForce(mg);
+      while (_sequence.length > _maxMemoryCap) {
         _manga.remove(_sequence.removeAt(0));
       }
     }
+  }
+
+  static void retainLinkedForce(LinkedManga mg) {
+    _manga[mg.id] = Chapters.all(
+        mangaId: mg.id,
+        linkedId: mg.linkedId,
+        chaps: mg.chapters,
+        currentIndex: -1,
+        s: mg.source);
+    _sequence.add(mg.id);
   }
 
   static Chapters remember(String mangaId, int index) {
