@@ -1347,7 +1347,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
           chaps: part.chapters,
           s: part.source,
           currentIndex: this.widget.index);
-      Memory.retainLinkedForce(part);
+      Memory.retainLinked(part);
     }
     ChapterPosition position = await APIer.fetchChapterPageNumber(
         _current.mangaId, _current.chaps[_current.currentIndex].sequenceNumber);

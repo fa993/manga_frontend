@@ -332,7 +332,7 @@ class DBer {
         description: description,
         allGenres: allGenres,
       );
-      if(_permanentModel != null) {
+      if (_permanentModel != null) {
         _permanentModel.addManga(m);
       }
       await txn.insert(
@@ -350,7 +350,7 @@ class DBer {
       where: 'saved_manga_id = ?',
       whereArgs: [id],
     );
-    if(_permanentModel != null) {
+    if (_permanentModel != null) {
       _permanentModel.removeManga(id);
     }
     return null;
@@ -359,8 +359,9 @@ class DBer {
   static Future<bool> isSaved(String id) async {
     return Sqflite.firstIntValue(await _mangaDB.rawQuery(
           'SELECT EXISTS(SELECT 1 from $_savedMangaTableName WHERE saved_manga_id = ?)',
-          [id],))
-        == 1;
+          [id],
+        )) ==
+        1;
   }
 
   static void reorder(String id1, String id2) {
@@ -388,7 +389,7 @@ class DBer {
       await txn.rawUpdate(
           'UPDATE $_savedMangaTableName set manga_index = ? where saved_manga_id = ?',
           [index2, id1]);
-      if(_permanentModel != null) {
+      if (_permanentModel != null) {
         _permanentModel.reorder(id1, id2);
       }
     });
@@ -497,33 +498,6 @@ class Memory {
   static String _message;
 
   static void retain(CompleteManga mg) {
-    if (!_manga.containsKey(mg.id)) {
-      _manga[mg.id] = Chapters.all(
-          mangaId: mg.id,
-          linkedId: mg.linkedId,
-          chaps: mg.chapters,
-          currentIndex: -1,
-          s: mg.source);
-      _sequence.add(mg.id);
-      if (_sequence.length > _maxMemoryCap) {
-        _manga.remove(_sequence.removeAt(0));
-      }
-    }
-    mg.linkedMangas.forEach((element) {
-      retainLinked(element);
-    });
-  }
-
-  static void retainLinked(LinkedManga mg) {
-    if (!_manga.containsKey(mg.id)) {
-      retainLinkedForce(mg);
-      while (_sequence.length > _maxMemoryCap) {
-        _manga.remove(_sequence.removeAt(0));
-      }
-    }
-  }
-
-  static void retainLinkedForce(LinkedManga mg) {
     _manga[mg.id] = Chapters.all(
         mangaId: mg.id,
         linkedId: mg.linkedId,
@@ -531,6 +505,25 @@ class Memory {
         currentIndex: -1,
         s: mg.source);
     _sequence.add(mg.id);
+    while (_sequence.length > _maxMemoryCap) {
+      _manga.remove(_sequence.removeAt(0));
+    }
+    mg.linkedMangas.forEach((element) {
+      retainLinked(element);
+    });
+  }
+
+  static void retainLinked(LinkedManga mg) {
+    _manga[mg.id] = Chapters.all(
+        mangaId: mg.id,
+        linkedId: mg.linkedId,
+        chaps: mg.chapters,
+        currentIndex: -1,
+        s: mg.source);
+    _sequence.add(mg.id);
+    while (_sequence.length > _maxMemoryCap) {
+      _manga.remove(_sequence.removeAt(0));
+    }
   }
 
   static Chapters remember(String mangaId, int index) {
@@ -646,7 +639,6 @@ class SavedManga extends MangaHeading {
 }
 
 class SavedMangaTable extends ChangeNotifier {
-
   static final _uuid = uuid.Uuid();
 
   String _id;
@@ -660,7 +652,6 @@ class SavedMangaTable extends ChangeNotifier {
     this._id = _uuid.v1();
   }
 
-
   SavedMangaTable.fromList(List<SavedManga> m) {
     this._list = m;
   }
@@ -670,21 +661,21 @@ class SavedMangaTable extends ChangeNotifier {
   }
 
   addManga(SavedManga m) {
-    if(this._list != null) {
+    if (this._list != null) {
       this._list.add(m);
       doNotifyListeners();
     }
   }
 
   removeManga(String id) {
-    if(this._list != null) {
+    if (this._list != null) {
       this._list.removeWhere((element) => element.id == id);
       doNotifyListeners();
     }
   }
 
   reorder(String id1, String id2) {
-    if(this._list != null) {
+    if (this._list != null) {
       SavedManga m = this._list.firstWhere((element) => element.id == id1);
       SavedManga m2 = this._list.firstWhere((element) => element.id == id2);
       int tmp = m.index;
@@ -696,15 +687,15 @@ class SavedMangaTable extends ChangeNotifier {
   List<SavedManga> get getList {
     return this._list;
   }
-  
+
   void doDispose() {
     this._disposed = true;
-    if(this._parent != null) {
+    if (this._parent != null) {
       this._parent._childs.remove(this);
     }
     this.dispose();
   }
-  
+
   bool get isDisposed {
     return this._disposed;
   }
@@ -718,15 +709,19 @@ class SavedMangaTable extends ChangeNotifier {
 
   void doNotifyListeners() {
     this._childs.forEach((t) {
-      if(!t.isDisposed) {
-          t.notifyListeners();
+      if (!t.isDisposed) {
+        t.notifyListeners();
       }
     });
     this.notifyListeners();
   }
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is SavedMangaTable && runtimeType == other.runtimeType && _id == other._id;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SavedMangaTable &&
+          runtimeType == other.runtimeType &&
+          _id == other._id;
 
   @override
   int get hashCode => _id.hashCode;
