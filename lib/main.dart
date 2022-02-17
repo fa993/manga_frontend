@@ -1015,17 +1015,16 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   }
 
   bool fetchMore([int limit = 10]) {
+    return fetch(limit);
+  }
+
+  bool fetch([int limit = 10]) {
     if (!_isLoading ||
         DateTime.now().millisecondsSinceEpoch - _t > _rateLimitFetchMore) {
       _t = DateTime.now().millisecondsSinceEpoch;
-      fetch(limit);
-      return true;
     } else {
       return false;
     }
-  }
-
-  void fetch([int limit = 10]) {
     startedLoading();
     _mangaQuery.limit = limit;
     _mangaQuery.offset = _hdFromAPI.length;
@@ -1046,6 +1045,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
       }
       stoppedLoading();
     });
+    return true;
   }
 
   void fetchAgain() {
