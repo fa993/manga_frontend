@@ -981,7 +981,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   bool _isLoading = false;
   MangaQuery _mangaQuery;
   int _t = DateTime.now().millisecondsSinceEpoch;
-  int _rateLimitFetchMore = 100;
+  int _rateLimitFetchMore = 500;
 
   bool _finished = false;
 
