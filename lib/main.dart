@@ -980,8 +980,11 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
 
   bool _isLoading = false;
   MangaQuery _mangaQuery;
+  String _lastExecutedQueryId;
   int _t = DateTime.now().millisecondsSinceEpoch;
   int _rateLimitFetchMore = 500;
+  Timer _searchTimer;
+
 
   bool _finished = false;
 
@@ -989,18 +992,24 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   void initState() {
     super.initState();
     _mangaQuery = MangaQuery();
+    _searchTimer = Timer.periodic(Duration(milliseconds: _rateLimitFetchMore), (timer) {
+      if(this.mounted && _mangaQuery.id != _lastExecutedQueryId) {
+        fetchAgain();
+      }
+    });
     _sc.addListener(() {
       if (_sc.offset >= _sc.position.maxScrollExtent &&
           !_sc.position.outOfRange) {
         fetchMore();
       }
     });
-    fetchMore();
+    // fetchMore();
   }
 
   @override
   void dispose() {
     _sc.dispose();
+    _searchTimer.cancel();
     super.dispose();
   }
 
@@ -1019,13 +1028,18 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   }
 
   bool fetch([int limit = 10]) {
-    if (!_isLoading ||
-        DateTime.now().millisecondsSinceEpoch - _t > _rateLimitFetchMore) {
-      _t = DateTime.now().millisecondsSinceEpoch;
-    } else {
+    // if (!_isLoading ||
+    //     DateTime.now().millisecondsSinceEpoch - _t > _rateLimitFetchMore) {
+    //   _t = DateTime.now().millisecondsSinceEpoch;
+    //   _lastExecutedQuery = _mangaQuery;
+    // } else {
+    //   return false;
+    // }
+    if(_isLoading) {
       return false;
     }
     startedLoading();
+    _lastExecutedQueryId = _mangaQuery.id;
     _mangaQuery.limit = limit;
     _mangaQuery.offset = _hdFromAPI.length;
     APIer.fetchSearch(_mangaQuery).then((value) {
@@ -1114,7 +1128,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
                         _mangaQuery
                           ..renew()
                           ..name = text;
-                        fetchAgain();
+                        // fetchAgain();
                       },
                       autofocus: true,
                     ),
