@@ -84,12 +84,12 @@ class _MangaThumbnailState extends State<MangaThumbnail> {
     return Dismissible(
       key: ObjectKey(widget.hd.id),
       confirmDismiss: (d) {
-        if (_isSaved != null) {
-          bool x = widget.onDismiss.call(d);
-          setState(() {
-            _isSaved = x;
-          });
-        }
+        // if (_isSaved != null) {
+        //   bool x = widget.onDismiss.call(d);
+        //   setState(() {
+        //     _isSaved = x;
+        //   });
+        // }
         return Future.value(false);
       },
       child: FutureBuilder(
@@ -798,7 +798,8 @@ class _MangaPageState extends State<MangaPage> {
 
   void onToggleFavourite(bool b) {
     if (!b) {
-      FirebaseMessaging.instance.subscribeToTopic(widget.manga.linkedId);
+      FirebaseMessaging.instance.subscribeToTopic(widget.manga.id);
+      widget.manga.linkedMangas.forEach((e) => FirebaseMessaging.instance.subscribeToTopic(e.id));
       DBer.saveManga(
               widget.manga.id,
               widget.manga.title,
@@ -807,7 +808,8 @@ class _MangaPageState extends State<MangaPage> {
               MangaPage.genresToString(widget.manga.genres))
           .then((value) => _isSaved.value = true);
     } else {
-      FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.linkedId);
+      FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.id);
+      widget.manga.linkedMangas.forEach((e) => FirebaseMessaging.instance.unsubscribeFromTopic(e.id));
       DBer.removeManga(widget.manga.id).then((value) => _isSaved.value = false);
     }
   }

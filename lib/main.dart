@@ -1092,6 +1092,7 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   }
 
   bool onDismiss(MangaHeading hd, DismissDirection dir) {
+    //TODO this has to be fixed by figuring out how to deal with linkedManga
     if (dir == DismissDirection.startToEnd) {
       DBer.saveMangaHeading(hd);
       return true;
