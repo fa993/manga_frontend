@@ -1035,9 +1035,9 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
     // } else {
     //   return false;
     // }
-    if(_isLoading) {
-      return false;
-    }
+    // if(_isLoading) {
+    //   return false;
+    // }
     startedLoading();
     _lastExecutedQueryId = _mangaQuery.id;
     _mangaQuery.limit = limit;

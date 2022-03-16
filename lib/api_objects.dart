@@ -36,7 +36,8 @@ class APIer {
       _retryExponentialBackOff(_fetchFavourites);
 
   static Future<MangaQueryResponse> fetchSearch(MangaQuery mangaQuery) async =>
-      _retryExponentialBackOff(() => _fetchSearch(mangaQuery));
+      _fetchSearch(mangaQuery);
+      // _retryExponentialBackOff(() => _fetchSearch(mangaQuery));
 
   static Future<CompleteManga> fetchManga(String id) async =>
       _retryExponentialBackOff(() => _fetchManga(id));
