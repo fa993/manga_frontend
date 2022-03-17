@@ -941,7 +941,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
             child: Container(
                 padding: EdgeInsets.all(16.0),
                 child: ReorderableWrap(
-                    needsLongPressDraggable: false,
+                    needsLongPressDraggable: true,
                     spacing: 16.0,
                     children: renderedManga,
                     maxMainAxisCount: 3,
