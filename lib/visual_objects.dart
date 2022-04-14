@@ -916,19 +916,17 @@ class ChapterPageForVertical extends StatelessWidget {
       imageUrl: url,
       width: width,
       fadeInDuration: Duration.zero,
-      progressIndicatorBuilder: (context, s, pr) => Center(
-        child: SizedBox(
-          width: 30,
-          height: 30,
-          child: CircularProgressIndicator(
-            value: pr.progress,
+      progressIndicatorBuilder: (context, s, pr) => SizedBox(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          child: Center(
+            child: CircularProgressIndicator(value: pr.progress,),
           ),
-        ),
       ),
-      errorWidget: (context, s, data) => Center(
-        child: SizedBox(
-          width: 30,
-          height: 30,
+      errorWidget: (context, s, data) => SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: Center(
           child: Icon(
             Icons.error,
             color: Colors.white,

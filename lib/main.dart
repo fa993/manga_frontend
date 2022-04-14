@@ -656,13 +656,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onClickGenre(BuildContext context) {
+    double off = 20;
+    //TODO: fix this
     if (_genreEntry == null) {
       _genreEntry = OverlayEntry(
         builder: (context) {
           return Positioned(
+            width: MediaQuery.of(context).size.width / 2,
+            // right: 20,
+            height: MediaQuery.of(context).size.height - 180 - off,
             child: CompositedTransformFollower(
               link: _link,
-              offset: Offset(0, 20),
+              offset: Offset(-off, off),
               showWhenUnlinked: false,
               followerAnchor: Alignment.topCenter,
               targetAnchor: Alignment.bottomCenter,
@@ -671,7 +676,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 child: _genres.length == 0
                     ? Text("Loading")
                     : ListView.separated(
-                        padding: EdgeInsets.all(0.0),
+                        padding: EdgeInsets.all(8.0),
                         itemBuilder: (context, index) => ListTile(
                           title: Text(
                               index == 0 ? "Clear" : _genres[index - 1].name),
@@ -985,15 +990,15 @@ class _SearchPageWidgetState extends State<SearchPageWidget> {
   int _rateLimitFetchMore = 500;
   Timer _searchTimer;
 
-
   bool _finished = false;
 
   @override
   void initState() {
     super.initState();
     _mangaQuery = MangaQuery();
-    _searchTimer = Timer.periodic(Duration(milliseconds: _rateLimitFetchMore), (timer) {
-      if(this.mounted && _mangaQuery.id != _lastExecutedQueryId) {
+    _searchTimer =
+        Timer.periodic(Duration(milliseconds: _rateLimitFetchMore), (timer) {
+      if (this.mounted && _mangaQuery.id != _lastExecutedQueryId) {
         fetchAgain();
       }
     });
@@ -1809,8 +1814,8 @@ class _ReaderWidgetState extends State<ReaderWidget>
                           if (pgNum >= chp.content.urls.length) {
                             w = CenteredFixedCircle();
                           } else {
-                            w = Center(
-                              child: InteractiveViewer(
+                            w = InteractiveViewer(
+                              child: Center(
                                 child: ChapterPageForHorizontal(
                                   url: chp.content.urls[pgNum],
                                   s: chp.source,
