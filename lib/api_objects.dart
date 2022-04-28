@@ -59,6 +59,8 @@ class APIer {
   static Future<List<Genre>> fetchGenres() async =>
       _retryExponentialBackOff(_fetchGenres);
 
+  static Future<void> refreshSubscription(List<String> ids) async => _retryExponentialBackOff(() => _refreshSubscriptions(ids));
+
   //
 
   static Future<List<SavedManga>> _fetchFavourites() async {
@@ -192,6 +194,20 @@ class APIer {
       return (jsonDecode(response.body) as List)
           .map((e) => Genre.fromJSON(e))
           .toList();
+    }
+  }
+
+  static Future<void> _refreshSubscriptions(List<String> ids) async {
+    final response = await _cli.post(
+        Uri.parse(_serverURL + _serverMapping + "/refresh"),
+        headers: {"Content-type": "application/json"},
+        body: jsonEncode(ids)
+    );
+    if(response.statusCode != HttpStatus.ok) {
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
+    } else {
+      return null;
     }
   }
 }

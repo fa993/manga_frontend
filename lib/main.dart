@@ -19,7 +19,7 @@ import 'visual_objects.dart';
 void main() async {
   HttpOverrides.global = new DevHttpsOverrides();
   WidgetsFlutterBinding.ensureInitialized();
-  DBer.initializeDatabase();
+  DBer.initializeDatabase().then((y) => APIer.refreshSubscription(DBer.getTable().getList.map((e) => e.id).toList()));
   runApp(MyApp());
 }
 
@@ -930,6 +930,12 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         appBar: AppBar(
           title: Text("Favourites"),
           actions: [
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: () {
+                APIer.refreshSubscription(_table.getList.map((e) => e.id).toList());
+              },
+            ),
             IconButton(
               icon: Icon(Icons.search),
               onPressed: () {
