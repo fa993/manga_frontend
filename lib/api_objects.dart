@@ -26,11 +26,14 @@ class APIer {
                       count < 0 ? 0 : (_rd.nextDouble() * 1000).toInt(),
                   seconds: count < 0 ? 0 : min(maxWaitTime, pow(2, count))),
               func)
-          .onError((error, stackTrace) => _retryExponentialBackOff(
+          .onError((error, stackTrace) {
+            print(error);
+            print(stackTrace);
+            return _retryExponentialBackOff(
                 func,
                 count: count + 1,
                 maxWaitTime: maxWaitTime,
-              ));
+              );});
 
   static Future<List<SavedManga>> fetchFavourites() async =>
       _retryExponentialBackOff(_fetchFavourites);
@@ -60,6 +63,10 @@ class APIer {
       _retryExponentialBackOff(_fetchGenres);
 
   static Future<void> refreshSubscription(List<String> ids) async => _retryExponentialBackOff(() => _refreshSubscriptions(ids));
+
+  static void insertManga(String value, String sourceId) async => _retryExponentialBackOff(() => _insertManga(value, sourceId));
+
+  static Future<Map<String, String>> getAcceptedSources() async => _retryExponentialBackOff(_getAcceptedSources);
 
   //
 
@@ -208,6 +215,35 @@ class APIer {
           "Failed Status code: " + response.statusCode.toString());
     } else {
       return null;
+    }
+  }
+
+  static Future<void> _insertManga(String value, String sId) async {
+    final response = await _cli.post(
+        Uri.parse(_serverURL + _serverMapping + "/insert"),
+        headers: {"Content-type": "application/json"},
+        body: jsonEncode({
+          'id' : sId,
+          'url' : value,
+        })
+    );
+    if(response.statusCode != HttpStatus.ok) {
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
+    } else {
+      return null;
+    }
+  }
+
+  static Future<Map<String, String>> _getAcceptedSources() async {
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/currentSources"));
+    if (response.statusCode != HttpStatus.ok) {
+      throw new Exception(
+          "Failed Status code: " + response.statusCode.toString());
+    } else {
+      Map<String, dynamic> tu = jsonDecode(response.body);
+      var fu = tu.map((key, value) => MapEntry(key, value.toString()));
+      return fu;
     }
   }
 }
@@ -958,6 +994,7 @@ class LinkedManga {
   String coverURL;
   Source source;
   Map<int, ChapterData> chapters;
+  String status;
 
   LinkedManga.all(
       {this.id,
@@ -965,7 +1002,9 @@ class LinkedManga {
       this.name,
       this.coverURL,
       this.source,
-      this.chapters});
+      this.chapters,
+      this.status
+      });
 
   factory LinkedManga.fromJSON(Map<String, dynamic> json) {
     Map<int, ChapterData> dts = {};
@@ -980,6 +1019,7 @@ class LinkedManga {
       coverURL: json["coverURL"],
       source: Source.fromJSON(json["source"]),
       chapters: dts,
+      status: json["status"],
     );
   }
 }

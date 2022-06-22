@@ -19,7 +19,9 @@ import 'visual_objects.dart';
 void main() async {
   HttpOverrides.global = new DevHttpsOverrides();
   WidgetsFlutterBinding.ensureInitialized();
-  DBer.initializeDatabase().then((y) => APIer.refreshSubscription(DBer.getTable().getList.map((e) => e.id).toList()));
+  DBer.initializeDatabase()
+      // .then((y) => APIer.refreshSubscription(DBer.getTable().getList.map((e) => e.id).toList()))
+  ;
   runApp(MyApp());
 }
 
@@ -519,6 +521,7 @@ class _MyHomePageState extends State<MyHomePage> {
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
       ),
+      new DynamicInsertWidget(),
       new ProfilePageWidget(),
     ];
   }
@@ -593,12 +596,10 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.black,
         items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-              icon: Icon(widget.fcmInit ? Icons.home : Icons.home_outlined),
-              label: "Home"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.favorite), label: "Favorites"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(icon: Icon(widget.fcmInit ? Icons.home : Icons.home_outlined), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorites"),
+          BottomNavigationBarItem(icon: Icon(Icons.file_copy), label: "Insert"),
+          // BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
@@ -1275,6 +1276,71 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
     );
   }
 }
+
+class DynamicInsertWidget extends StatefulWidget {
+
+  const DynamicInsertWidget({Key key}) : super(key: key);
+
+  @override
+  _DynamicInsertWidgetState createState() => _DynamicInsertWidgetState();
+}
+
+class _DynamicInsertWidgetState extends State<DynamicInsertWidget> {
+
+  Map<String, String> _patterns = {};
+  final TextEditingController _controller = TextEditingController();
+
+
+
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    this.getPatterns();
+  }
+
+  void getPatterns() async {
+    _patterns = await APIer.getAcceptedSources();
+    print(_patterns);
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _controller.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Insert Manga"),
+      ),
+      body: Container(
+          color: Colors.black,
+          alignment: Alignment.center,
+          child: TextFormField(
+              controller: _controller,
+              decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.white
+              ),
+              validator: (value) {
+                return _patterns.keys.any((element) => value.startsWith(element)) ? null : "Source not supported";
+              },
+              onFieldSubmitted: (value) {
+                _controller.text = "";
+                APIer.insertManga(value, _patterns.entries.firstWhere((element) => value.startsWith(element.key)).value);
+              }
+          ),
+        ),
+    );
+  }
+}
+
 
 class ReaderWidget extends StatefulWidget {
   // final double settingsWidth = 100;
