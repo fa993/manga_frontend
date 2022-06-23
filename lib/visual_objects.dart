@@ -897,16 +897,13 @@ class _MangaPageState extends State<MangaPage> {
 }
 
 class ChapterPageForVertical extends StatelessWidget {
-  static Map<String, Map<String, String>> headers = {
-    "manganelo": {"Referer": "https://manganelo.com/"},
-    "readm": {},
-  };
 
+  final Map<String, Map<String, String>> headers;
   final String url;
   final Source s;
   final double width;
 
-  const ChapterPageForVertical({Key key, this.url, this.s, this.width})
+  const ChapterPageForVertical({Key key, this.url, this.s, this.width, this.headers})
       : super(key: key);
 
   @override
@@ -938,17 +935,13 @@ class ChapterPageForVertical extends StatelessWidget {
 }
 
 class ChapterPageForHorizontal extends StatelessWidget {
-  static Map<String, Map<String, String>> headers = {
-    "manganelo": {"Referer": "https://manganelo.com/"},
-    "readm": {},
-    "mangahasu" : {"Referer": "https://mangahasu.se/"}
-  };
 
+  final Map<String, Map<String, String>> headers;
   final String url;
   final Source s;
   final BoxFit fit;
 
-  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit})
+  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit, this.headers})
       : super(key: key);
 
   @override
