@@ -941,6 +941,7 @@ class ChapterPageForHorizontal extends StatelessWidget {
   static Map<String, Map<String, String>> headers = {
     "manganelo": {"Referer": "https://manganelo.com/"},
     "readm": {},
+    "mangahasu" : {"Referer": "https://mangahasu.se/"}
   };
 
   final String url;
