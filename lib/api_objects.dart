@@ -12,7 +12,7 @@ import 'package:uuid/uuid.dart' as uuid;
 
 class APIer {
   static String _serverURL = "https://lite.floricaninfosoft.com:9432";
-  static String _serverMapping = "/public/manga";
+  static String _serverMapping = "/public/manga/v1";
 
   static http.Client _cli = new http.Client();
 

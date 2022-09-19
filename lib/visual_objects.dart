@@ -1324,6 +1324,8 @@ class CompleteReaderInfo extends ChangeNotifier {
     _batSub = batStream.listen((event) {
       battery = event;
       notifyListeners();
+    }, onError: (err) {
+      print(err);
     });
     chapPage = chapPage;
     chapLen = chapLen;

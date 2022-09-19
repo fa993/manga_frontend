@@ -1347,6 +1347,12 @@ class ReaderWidget extends StatefulWidget {
   static final double settingsHeight = 100;
   static final int maxCacheCount = 1;
 
+  static final Map<String, Map<String, String>> headers  = {
+  "manganelo": {"Referer": "https://manganelo.com/"},
+  "readm": {},
+  "mangahasu" : {"Referer": "https://mangahasu.se/"}
+  };
+
   final String mangaId;
   final int index;
   final int lastSave;
@@ -1860,6 +1866,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
                                 url: chp.content.urls[pgNum],
                                 s: chp.source,
                                 width: MediaQuery.of(context).size.width,
+                                headers: ReaderWidget.headers,
                               ),
                             );
                           }
@@ -1892,6 +1899,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
                                   url: chp.content.urls[pgNum],
                                   s: chp.source,
                                   fit: BoxFit.contain,
+                                  headers: ReaderWidget.headers,
                                 ),
                               ),
                             );
