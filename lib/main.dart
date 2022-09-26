@@ -501,6 +501,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int _selectionIndex = 0;
 
   List<Widget> _actualNavs;
+  List<ScrollController> _scrollControllers;
 
   StreamSubscription _streamSubscription;
 
@@ -512,14 +513,21 @@ class _MyHomePageState extends State<MyHomePage> {
     if (widget.fcmInit) {
       _setupFCM();
     }
+    _scrollControllers = [
+      ScrollController(),
+      ScrollController(),
+      ScrollController()
+    ];
     _actualNavs = <Widget>[
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
+        sc: _scrollControllers[0]
       ),
       new FavouritesPageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
+        sc: _scrollControllers[1]
       ),
       new DynamicInsertWidget(),
       new ProfilePageWidget(),
@@ -604,9 +612,13 @@ class _MyHomePageState extends State<MyHomePage> {
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
         onTap: (t) {
-          setState(() {
-            _selectionIndex = t;
-          });
+          if(_selectionIndex == t) {
+            _scrollControllers[t].animateTo(0, duration: Duration(milliseconds: 200), curve: Curves.easeIn);
+          } else {
+            setState(() {
+              _selectionIndex = t;
+            });
+          }
         },
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
@@ -616,8 +628,9 @@ class _MyHomePageState extends State<MyHomePage> {
 class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
+  final ScrollController sc;
 
-  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked})
+  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc})
       : super(key: key);
 
   @override
@@ -634,16 +647,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   OverlayEntry _genreEntry;
   LayerLink _link;
 
-  ScrollController _scGrid;
-
   @override
   void initState() {
     super.initState();
-    _scGrid = ScrollController();
     _link = LayerLink();
-    _scGrid.addListener(() {
-      if (_scGrid.offset >= _scGrid.position.maxScrollExtent &&
-          !_scGrid.position.outOfRange) {
+    this.widget.sc.addListener(() {
+      if (this.widget.sc.offset >= this.widget.sc.position.maxScrollExtent &&
+          !this.widget.sc.position.outOfRange) {
         fetchManga(_mnc.length);
       }
     });
@@ -730,8 +740,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     _finished = false;
     List<MangaHeading> hd = await doFetchManga(0, 20);
     int i = -1;
-    if (_scGrid.hasClients) {
-      _scGrid.jumpTo(0);
+    if (this.widget.sc.hasClients) {
+      this.widget.sc.jumpTo(0);
     }
     if (mounted) {
       setState(() {
@@ -790,7 +800,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      controller: _scGrid,
+      controller: this.widget.sc,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -851,9 +861,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 class FavouritesPageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
+  final ScrollController sc;
 
   const FavouritesPageWidget(
-      {Key key, this.onSearchClicked, this.onMangaClicked})
+      {Key key, this.onSearchClicked, this.onMangaClicked, this.sc})
       : super(key: key);
 
   @override
@@ -950,6 +961,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         body: Align(
           alignment: Alignment.topLeft,
           child: SingleChildScrollView(
+            controller: this.widget.sc,
             child: Container(
                 padding: EdgeInsets.all(16.0),
                 child: ReorderableWrap(
