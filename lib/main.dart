@@ -507,6 +507,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String _homeLabel = "Home";
 
+  List<MangaHeading> _cached = [];
+  List<String> _selectedGenres = [];
+
   @override
   void initState() {
     super.initState();
@@ -522,7 +525,9 @@ class _MyHomePageState extends State<MyHomePage> {
       new HomePageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
-        sc: _scrollControllers[0]
+        sc: _scrollControllers[0],
+        cache: _cached,
+        selectedGenres: _selectedGenres,
       ),
       new FavouritesPageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -629,8 +634,10 @@ class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
   final ScrollController sc;
+  final List<MangaHeading> cache;
+  final List<String> selectedGenres;
 
-  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc})
+  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc, this.cache, this.selectedGenres})
       : super(key: key);
 
   @override
@@ -657,8 +664,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         fetchManga(_mnc.length);
       }
     });
-    fetchBegin();
+    if(this.widget.cache.isNotEmpty) {
+      _mnc.clear();
+      for(int i = 0; i < this.widget.cache.length; i++) {
+        _mnc[i] = this.widget.cache[i];
+      }
+    } else {
+      fetchBegin();
+    }
     fetchGenres();
+    _query.genres.addAll(this.widget.selectedGenres);
   }
 
   @override
@@ -694,10 +709,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                           onTap: () {
                             if (index == 0) {
                               _query.genres.clear();
+                              this.widget.selectedGenres.clear();
                             } else {
-                              _query.genres.contains(_genres[index - 1].id)
-                                  ? _query.genres.remove(_genres[index - 1].id)
-                                  : _query.genres.add(_genres[index - 1].id);
+                              if(_query.genres.contains(_genres[index - 1].id)) {
+                                _query.genres.remove(_genres[index - 1].id);
+                                this.widget.selectedGenres.remove(_genres[index - 1].id);
+                              } else {
+                                _query.genres.add(_genres[index - 1].id);
+                                this.widget.selectedGenres.add(_genres[index - 1].id);
+                              }
                             }
                             fetchBegin(true);
                             _genreEntry.markNeedsBuild();
@@ -743,6 +763,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (this.widget.sc.hasClients) {
       this.widget.sc.jumpTo(0);
     }
+    this.widget.cache.clear();
+    this.widget.cache.addAll(hd);
     if (mounted) {
       setState(() {
         _mnc.clear();
