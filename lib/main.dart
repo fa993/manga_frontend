@@ -501,14 +501,14 @@ class _MyHomePageState extends State<MyHomePage> {
   int _selectionIndex = 0;
 
   List<Widget> _actualNavs;
-  List<ScrollController> _scrollControllers;
+
+  PageStorageBucket _bucket = new PageStorageBucket();
 
   StreamSubscription _streamSubscription;
 
   String _homeLabel = "Home";
 
-  List<MangaHeading> _cached = [];
-  List<String> _selectedGenres = [];
+  GenresAndHeadings _gc = new GenresAndHeadings({}, []);
 
   @override
   void initState() {
@@ -516,23 +516,17 @@ class _MyHomePageState extends State<MyHomePage> {
     if (widget.fcmInit) {
       _setupFCM();
     }
-    _scrollControllers = [
-      ScrollController(),
-      ScrollController(),
-      ScrollController()
-    ];
     _actualNavs = <Widget>[
       new HomePageWidget(
+        key: const PageStorageKey('home'),
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
-        sc: _scrollControllers[0],
-        cache: _cached,
-        selectedGenres: _selectedGenres,
+        cachedContent: _gc,
       ),
       new FavouritesPageWidget(
+        // key: const PageStorageKey('favourites'),
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
-        sc: _scrollControllers[1]
       ),
       new DynamicInsertWidget(),
       new ProfilePageWidget(),
@@ -605,7 +599,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
-      body: _actualNavs[_selectionIndex],
+      body: PageStorage(
+        child: _actualNavs[_selectionIndex],
+        bucket: _bucket,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.black,
         items: <BottomNavigationBarItem>[
@@ -617,13 +614,9 @@ class _MyHomePageState extends State<MyHomePage> {
         currentIndex: _selectionIndex,
         selectedItemColor: Colors.lime,
         onTap: (t) {
-          if(_selectionIndex == t) {
-            _scrollControllers[t].animateTo(0, duration: Duration(milliseconds: 200), curve: Curves.easeIn);
-          } else {
-            setState(() {
-              _selectionIndex = t;
-            });
-          }
+          setState(() {
+            _selectionIndex = t;
+          });
         },
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
@@ -633,11 +626,9 @@ class _MyHomePageState extends State<MyHomePage> {
 class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
-  final ScrollController sc;
-  final List<MangaHeading> cache;
-  final List<String> selectedGenres;
+  final GenresAndHeadings cachedContent;
 
-  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc, this.cache, this.selectedGenres})
+  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.cachedContent})
       : super(key: key);
 
   @override
@@ -654,26 +645,27 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   OverlayEntry _genreEntry;
   LayerLink _link;
 
+  ScrollController _sc = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _link = LayerLink();
-    this.widget.sc.addListener(() {
-      if (this.widget.sc.offset >= this.widget.sc.position.maxScrollExtent &&
-          !this.widget.sc.position.outOfRange) {
+    _sc.addListener(() {
+      if (_sc.offset >= _sc.position.maxScrollExtent &&
+          !_sc.position.outOfRange) {
         fetchManga(_mnc.length);
       }
     });
-    if(this.widget.cache.isNotEmpty) {
-      _mnc.clear();
-      for(int i = 0; i < this.widget.cache.length; i++) {
-        _mnc[i] = this.widget.cache[i];
-      }
-    } else {
+    // GenresAndHeadings t = PageStorage.of(context).readState(context, identifier: widget.key);
+    if(widget.cachedContent.headings == null) {
       fetchBegin();
+    } else {
+      _mnc = widget.cachedContent.headings;
+      _query.genres = widget.cachedContent.genres;
     }
+    widget.cachedContent.headings = _mnc;
     fetchGenres();
-    _query.genres.addAll(this.widget.selectedGenres);
   }
 
   @override
@@ -709,15 +701,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                           onTap: () {
                             if (index == 0) {
                               _query.genres.clear();
-                              this.widget.selectedGenres.clear();
                             } else {
                               if(_query.genres.contains(_genres[index - 1].id)) {
                                 _query.genres.remove(_genres[index - 1].id);
-                                this.widget.selectedGenres.remove(_genres[index - 1].id);
                               } else {
                                 _query.genres.add(_genres[index - 1].id);
-                                this.widget.selectedGenres.add(_genres[index - 1].id);
                               }
+                            }
+                            if (_sc.hasClients) {
+                              _sc.jumpTo(0);
                             }
                             fetchBegin(true);
                             _genreEntry.markNeedsBuild();
@@ -760,11 +752,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     _finished = false;
     List<MangaHeading> hd = await doFetchManga(0, 20);
     int i = -1;
-    if (this.widget.sc.hasClients) {
-      this.widget.sc.jumpTo(0);
-    }
-    this.widget.cache.clear();
-    this.widget.cache.addAll(hd);
     if (mounted) {
       setState(() {
         _mnc.clear();
@@ -773,6 +760,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         }
       });
     }
+    // PageStorage.of(context).writeState(context, GenresAndHeadings(_mnc, _query.genres), identifier: widget.key);
     if (entry) {
       _genreEntry?.markNeedsBuild();
     }
@@ -804,6 +792,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         }
       });
     }
+    // PageStorage.of(context).writeState(context, GenresAndHeadings(_mnc, _query.genres), identifier: widget.key);
     _loading = false;
   }
 
@@ -822,7 +811,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      controller: this.widget.sc,
+      controller: _sc,
       slivers: [
         SliverAppBar(
           title: Text("Home"),
@@ -883,10 +872,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 class FavouritesPageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
-  final ScrollController sc;
 
   const FavouritesPageWidget(
-      {Key key, this.onSearchClicked, this.onMangaClicked, this.sc})
+      {Key key, this.onSearchClicked, this.onMangaClicked})
       : super(key: key);
 
   @override
@@ -898,6 +886,8 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
 
   SavedMangaTable _table;
 
+  ScrollController _sc = ScrollController();
+
   updateDisplay() {
     if (this.mounted) {
       setState(() {});
@@ -908,7 +898,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
   void initState() {
     super.initState();
     _table = DBer.getTable();
-    _table.addListener(this.updateDisplay);
+    // _table.addListener(this.updateDisplay);
   }
 
   @override
@@ -983,7 +973,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
         body: Align(
           alignment: Alignment.topLeft,
           child: SingleChildScrollView(
-            controller: this.widget.sc,
+            controller: _sc,
             child: Container(
                 padding: EdgeInsets.all(16.0),
                 child: ReorderableWrap(
@@ -2159,4 +2149,11 @@ class DevHttpsOverrides extends HttpOverrides {
       ..badCertificateCallback =
           (X509Certificate cert, String host, int port) => true;
   }
+}
+
+class GenresAndHeadings {
+  Map<int, MangaHeading> headings;
+  List<String> genres;
+
+  GenresAndHeadings(this.headings, this.genres);
 }
