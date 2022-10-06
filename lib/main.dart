@@ -507,8 +507,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String _homeLabel = "Home";
 
-  List<String> _selected;
-  List<MangaHeading> _cached;
+  List<MangaHeading> _cached = [];
+  List<String> _selectedGenres = [];
 
   @override
   void initState() {
@@ -527,7 +527,7 @@ class _MyHomePageState extends State<MyHomePage> {
         onMangaClicked: this.widget.onMangaClick,
         sc: _scrollControllers[0],
         cache: _cached,
-        selectedGenre: _selected,
+        selectedGenres: _selectedGenres,
       ),
       new FavouritesPageWidget(
         onSearchClicked: this.widget.onSearchPageClick,
@@ -634,10 +634,10 @@ class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
   final ScrollController sc;
-  final List<String> selectedGenre;
   final List<MangaHeading> cache;
+  final List<String> selectedGenres;
 
-  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc, this.selectedGenre, this.cache})
+  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.sc, this.cache, this.selectedGenres})
       : super(key: key);
 
   @override
@@ -664,7 +664,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         fetchManga(_mnc.length);
       }
     });
-    if(_query.genres == this.widget.selectedGenre) {
+    if(this.widget.cache.isNotEmpty) {
       _mnc.clear();
       for(int i = 0; i < this.widget.cache.length; i++) {
         _mnc[i] = this.widget.cache[i];
@@ -673,6 +673,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       fetchBegin();
     }
     fetchGenres();
+    _query.genres.addAll(this.widget.selectedGenres);
   }
 
   @override
@@ -708,15 +709,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                           onTap: () {
                             if (index == 0) {
                               _query.genres.clear();
-                              this.widget.cache.clear();
-                              this.widget.selectedGenre.clear();
+                              this.widget.selectedGenres.clear();
                             } else {
                               if(_query.genres.contains(_genres[index - 1].id)) {
                                 _query.genres.remove(_genres[index - 1].id);
-                                this.widget.selectedGenre.remove(_genres[index - 1].id);
+                                this.widget.selectedGenres.remove(_genres[index - 1].id);
                               } else {
                                 _query.genres.add(_genres[index - 1].id);
-                                this.widget.selectedGenre.add(_genres[index - 1].id);
+                                this.widget.selectedGenres.add(_genres[index - 1].id);
                               }
                             }
                             fetchBegin(true);
