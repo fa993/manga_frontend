@@ -64,6 +64,8 @@ class APIer {
 
   static Future<void> refreshSubscription(List<String> ids) async => _retryExponentialBackOff(() => _refreshSubscriptions(ids));
 
+  static Future<void> refreshSingle(List<String> mangaIds) async => _retryExponentialBackOff(() => _refreshSingle(mangaIds));
+
   static void insertManga(String value, String sourceId) async => _retryExponentialBackOff(() => _insertManga(value, sourceId));
 
   static Future<Map<String, String>> getAcceptedSources() async => _retryExponentialBackOff(_getAcceptedSources);
@@ -205,18 +207,23 @@ class APIer {
   }
 
   static Future<void> _refreshSubscriptions(List<String> ids) async {
-    final response = await _cli.post(
+    _cli.post(
         Uri.parse(_serverURL + _serverMapping + "/refresh"),
         headers: {"Content-type": "application/json"},
         body: jsonEncode(ids)
     );
-    if(response.statusCode != HttpStatus.ok) {
-      throw new Exception(
-          "Failed Status code: " + response.statusCode.toString());
-    } else {
-      return null;
-    }
+    return Future.value(null);
   }
+
+  static Future<void> _refreshSingle(List<String> mangaIds) async {
+    _cli.post(
+        Uri.parse(_serverURL + _serverMapping + "/refreshOne"),
+        headers: {"Content-type": "application/json"},
+        body: jsonEncode(mangaIds)
+    );
+    return Future.value(null);
+  }
+
 
   static Future<void> _insertManga(String value, String sId) async {
     final response = await _cli.post(

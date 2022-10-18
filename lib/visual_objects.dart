@@ -799,7 +799,8 @@ class _MangaPageState extends State<MangaPage> {
   void onToggleFavourite(bool b) {
     if (!b) {
       FirebaseMessaging.instance.subscribeToTopic(widget.manga.id);
-      widget.manga.linkedMangas.forEach((e) => FirebaseMessaging.instance.subscribeToTopic(e.id));
+      widget.manga.linkedMangas
+          .forEach((e) => FirebaseMessaging.instance.subscribeToTopic(e.id));
       DBer.saveManga(
               widget.manga.id,
               widget.manga.title,
@@ -809,7 +810,8 @@ class _MangaPageState extends State<MangaPage> {
           .then((value) => _isSaved.value = true);
     } else {
       FirebaseMessaging.instance.unsubscribeFromTopic(widget.manga.id);
-      widget.manga.linkedMangas.forEach((e) => FirebaseMessaging.instance.unsubscribeFromTopic(e.id));
+      widget.manga.linkedMangas.forEach(
+          (e) => FirebaseMessaging.instance.unsubscribeFromTopic(e.id));
       DBer.removeManga(widget.manga.id).then((value) => _isSaved.value = false);
     }
   }
@@ -870,11 +872,32 @@ class _MangaPageState extends State<MangaPage> {
                     width: 30,
                   ),
                   ValueListenableBuilder(
-                      valueListenable: _notifier,
-                      builder: (context, val, child) => LastReadChapterButton(
-                            readChapter: this.toSlice(val),
-                            onClickReadChapter: this.onClickReadChapter,
-                          ))
+                    valueListenable: _notifier,
+                    builder: (context, val, child) => LastReadChapterButton(
+                      readChapter: this.toSlice(val),
+                      onClickReadChapter: this.onClickReadChapter,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 30,
+                  ),
+                  OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        side: BorderSide(
+                          color: Colors.green,
+                          width: 2.0,
+                        ),
+                      ),
+                      onPressed: () {
+                        var y =
+                            widget.manga.linkedMangas.map((e) => e.id).toList();
+                        y.add(widget.manga.id);
+                        APIer.refreshSingle(y);
+                      },
+                      child: Icon(Icons.refresh),),
                 ],
               );
             case 3:
@@ -897,13 +920,13 @@ class _MangaPageState extends State<MangaPage> {
 }
 
 class ChapterPageForVertical extends StatelessWidget {
-
   final Map<String, Map<String, String>> headers;
   final String url;
   final Source s;
   final double width;
 
-  const ChapterPageForVertical({Key key, this.url, this.s, this.width, this.headers})
+  const ChapterPageForVertical(
+      {Key key, this.url, this.s, this.width, this.headers})
       : super(key: key);
 
   @override
@@ -914,11 +937,13 @@ class ChapterPageForVertical extends StatelessWidget {
       width: width,
       fadeInDuration: Duration.zero,
       progressIndicatorBuilder: (context, s, pr) => SizedBox(
-          width: MediaQuery.of(context).size.width,
-          height: MediaQuery.of(context).size.height,
-          child: Center(
-            child: CircularProgressIndicator(value: pr.progress,),
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: Center(
+          child: CircularProgressIndicator(
+            value: pr.progress,
           ),
+        ),
       ),
       errorWidget: (context, s, data) => SizedBox(
         width: MediaQuery.of(context).size.width,
@@ -935,13 +960,13 @@ class ChapterPageForVertical extends StatelessWidget {
 }
 
 class ChapterPageForHorizontal extends StatelessWidget {
-
   final Map<String, Map<String, String>> headers;
   final String url;
   final Source s;
   final BoxFit fit;
 
-  const ChapterPageForHorizontal({Key key, this.url, this.s, this.fit, this.headers})
+  const ChapterPageForHorizontal(
+      {Key key, this.url, this.s, this.fit, this.headers})
       : super(key: key);
 
   @override
@@ -1107,14 +1132,12 @@ class _ReaderPageSettingsPanelState extends State<ReaderPageSettingsPanel> {
 //   }
 // }
 
-
 class ReaderPageInfoPanel extends StatelessWidget {
   static final intl.DateFormat _formatter = intl.DateFormat.jm();
 
   final CompleteReaderInfo info;
 
-  const ReaderPageInfoPanel(this.info, {Key key})
-      : super(key: key);
+  const ReaderPageInfoPanel(this.info, {Key key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1122,20 +1145,20 @@ class ReaderPageInfoPanel extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(4.0, 2.0, 2.0, 2.0),
         color: Colors.black54,
         child: Text(
-              ((info.current == null ? "?" : _formatter.format(info.current)) +
+          ((info.current == null ? "?" : _formatter.format(info.current)) +
                   " Battery: " +
                   (info.battery == null ? "?" : info.battery.toString()) +
                   "% " +
                   (info.chapPage == null || info.chapLen == null
                       ? "?/?"
-                      : info.chapPage.toString() + "/" + info.chapLen.toString()))
-                  .trim(),
-              style: TextStyle(color: Colors.white),
-            )
-        );
+                      : info.chapPage.toString() +
+                          "/" +
+                          info.chapLen.toString()))
+              .trim(),
+          style: TextStyle(color: Colors.white),
+        ));
   }
 }
-
 
 class SideWheel extends CustomPainter {
   static const double length = 10;
