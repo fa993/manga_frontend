@@ -6,7 +6,6 @@ import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:manga_frontend/api_objects.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';

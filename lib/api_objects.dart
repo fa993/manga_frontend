@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart' as uuid;
 class APIer {
   static String _serverURL = "https://lite.floricaninfosoft.com:9432";
   static String _serverMapping = "/public/manga/v1";
+  static String _serverMapping2 = "/public/manga/v2";
 
   static http.Client _cli = new http.Client();
 
@@ -243,7 +244,7 @@ class APIer {
   }
 
   static Future<Map<String, String>> _getAcceptedSources() async {
-    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping + "/currentSources"));
+    final response = await _cli.get(Uri.parse(_serverURL + _serverMapping2 + "/allSources"));
     if (response.statusCode != HttpStatus.ok) {
       throw new Exception(
           "Failed Status code: " + response.statusCode.toString());

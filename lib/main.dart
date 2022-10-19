@@ -21,7 +21,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   DBer.initializeDatabase()
       // .then((y) => APIer.refreshSubscription(DBer.getTable().getList.map((e) => e.id).toList()))
-  ;
+      ;
   runApp(MyApp());
 }
 
@@ -606,8 +606,11 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.black,
         items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(widget.fcmInit ? Icons.home : Icons.home_outlined), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorites"),
+          BottomNavigationBarItem(
+              icon: Icon(widget.fcmInit ? Icons.home : Icons.home_outlined),
+              label: "Home"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.favorite), label: "Favorites"),
           BottomNavigationBarItem(icon: Icon(Icons.file_copy), label: "Insert"),
           // BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
@@ -628,7 +631,8 @@ class HomePageWidget extends StatefulWidget {
   final Function(String) onMangaClicked;
   final GenresAndHeadings cachedContent;
 
-  const HomePageWidget({Key key, this.onSearchClicked, this.onMangaClicked, this.cachedContent})
+  const HomePageWidget(
+      {Key key, this.onSearchClicked, this.onMangaClicked, this.cachedContent})
       : super(key: key);
 
   @override
@@ -658,7 +662,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       }
     });
     // GenresAndHeadings t = PageStorage.of(context).readState(context, identifier: widget.key);
-    if(widget.cachedContent.headings == null) {
+    if (widget.cachedContent.headings == null) {
       fetchBegin();
     } else {
       _mnc = widget.cachedContent.headings;
@@ -702,7 +706,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                             if (index == 0) {
                               _query.genres.clear();
                             } else {
-                              if(_query.genres.contains(_genres[index - 1].id)) {
+                              if (_query.genres
+                                  .contains(_genres[index - 1].id)) {
                                 _query.genres.remove(_genres[index - 1].id);
                               } else {
                                 _query.genres.add(_genres[index - 1].id);
@@ -957,7 +962,8 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
             IconButton(
               icon: Icon(Icons.refresh),
               onPressed: () {
-                APIer.refreshSubscription(_table.getList.map((e) => e.id).toList());
+                APIer.refreshSubscription(
+                    _table.getList.map((e) => e.id).toList());
               },
             ),
             IconButton(
@@ -1302,7 +1308,6 @@ class _MangaPageWidgetState extends State<MangaPageWidget> {
 }
 
 class DynamicInsertWidget extends StatefulWidget {
-
   const DynamicInsertWidget({Key key}) : super(key: key);
 
   @override
@@ -1310,12 +1315,10 @@ class DynamicInsertWidget extends StatefulWidget {
 }
 
 class _DynamicInsertWidgetState extends State<DynamicInsertWidget> {
-
-  Map<String, String> _patterns = {};
+  Map<String, String> _patterns;
   final TextEditingController _controller = TextEditingController();
-
-
-
+  String _dropDownValue = "NA";
+  List<String> _lst = ["NA"];
 
   @override
   void initState() {
@@ -1327,6 +1330,10 @@ class _DynamicInsertWidgetState extends State<DynamicInsertWidget> {
   void getPatterns() async {
     _patterns = await APIer.getAcceptedSources();
     print(_patterns);
+    setState(() {
+      _lst = _patterns.keys.toList()..sort();
+      _dropDownValue = _lst.first;
+    });
   }
 
   @override
@@ -1343,38 +1350,56 @@ class _DynamicInsertWidgetState extends State<DynamicInsertWidget> {
         title: const Text("Insert Manga"),
       ),
       body: Container(
-          color: Colors.black,
-          alignment: Alignment.center,
-          child: TextFormField(
-              controller: _controller,
-              decoration: InputDecoration(
+        color: Colors.black,
+        alignment: Alignment.center,
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   filled: true,
-                  fillColor: Colors.white
+                  fillColor: Colors.white,
+                ),
+                onSubmitted: (value) {
+                  _controller.text = "";
+                  APIer.insertManga(value, _patterns[_dropDownValue]);
+                },
               ),
-              validator: (value) {
-                return _patterns.keys.any((element) => value.startsWith(element)) ? null : "Source not supported";
+            ),
+            SizedBox(
+              width: 20,
+            ),
+            DropdownButton(
+              value: _dropDownValue,
+              items: _lst
+                  .map((e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(e, style: TextStyle(color: Colors.green))))
+                  .toList(),
+              onChanged: (t) => {
+                setState(() {
+                  _dropDownValue = t;
+                })
               },
-              onFieldSubmitted: (value) {
-                _controller.text = "";
-                APIer.insertManga(value, _patterns.entries.firstWhere((element) => value.startsWith(element.key)).value);
-              }
-          ),
+            ),
+          ],
         ),
+      ),
     );
   }
 }
-
 
 class ReaderWidget extends StatefulWidget {
   // final double settingsWidth = 100;
   static final double settingsHeight = 100;
   static final int maxCacheCount = 1;
 
-  static final Map<String, Map<String, String>> headers  = {
-  "manganelo": {"Referer": "https://manganelo.com/"},
-  "readm": {},
-  "mangahasu" : {"Referer": "https://mangahasu.se/"}
+  static final Map<String, Map<String, String>> headers = {
+    "manganelo": {"Referer": "https://manganelo.com/"},
+    "readm": {},
+    "mangahasu": {"Referer": "https://mangahasu.se/"}
   };
 
   final String mangaId;
