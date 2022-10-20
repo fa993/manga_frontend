@@ -510,6 +510,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   GenresAndHeadings _gc = new GenresAndHeadings({}, []);
 
+  List<ScrollController> _scs = [
+    ScrollController(),
+    ScrollController(),
+    ScrollController()
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -522,11 +528,13 @@ class _MyHomePageState extends State<MyHomePage> {
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
         cachedContent: _gc,
+        sc: _scs[0],
       ),
       new FavouritesPageWidget(
         // key: const PageStorageKey('favourites'),
         onSearchClicked: this.widget.onSearchPageClick,
         onMangaClicked: this.widget.onMangaClick,
+        sc: _scs[1]
       ),
       new DynamicInsertWidget(),
       new ProfilePageWidget(),
@@ -620,6 +628,9 @@ class _MyHomePageState extends State<MyHomePage> {
           setState(() {
             _selectionIndex = t;
           });
+          if (_scs[t].positions.isNotEmpty) {
+            _scs[t].animateTo(0, curve: Curves.fastOutSlowIn, duration: Duration(milliseconds: 200));
+          }
         },
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
@@ -630,9 +641,14 @@ class HomePageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
   final GenresAndHeadings cachedContent;
+  final ScrollController sc;
 
   const HomePageWidget(
-      {Key key, this.onSearchClicked, this.onMangaClicked, this.cachedContent})
+      {Key key,
+      this.onSearchClicked,
+      this.onMangaClicked,
+      this.cachedContent,
+      this.sc})
       : super(key: key);
 
   @override
@@ -649,12 +665,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   OverlayEntry _genreEntry;
   LayerLink _link;
 
-  ScrollController _sc = ScrollController();
+  ScrollController _sc;
 
   @override
   void initState() {
     super.initState();
     _link = LayerLink();
+    _sc = widget.sc;
     _sc.addListener(() {
       if (_sc.offset >= _sc.position.maxScrollExtent &&
           !_sc.position.outOfRange) {
@@ -877,9 +894,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 class FavouritesPageWidget extends StatefulWidget {
   final Function(bool) onSearchClicked;
   final Function(String) onMangaClicked;
+  final ScrollController sc;
 
   const FavouritesPageWidget(
-      {Key key, this.onSearchClicked, this.onMangaClicked})
+      {Key key, this.onSearchClicked, this.onMangaClicked, this.sc})
       : super(key: key);
 
   @override
@@ -891,7 +909,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
 
   SavedMangaTable _table;
 
-  ScrollController _sc = ScrollController();
+  ScrollController _sc;
 
   updateDisplay() {
     if (this.mounted) {
@@ -902,6 +920,7 @@ class _FavouritesPageWidgetState extends State<FavouritesPageWidget> {
   @override
   void initState() {
     super.initState();
+    _sc = widget.sc;
     _table = DBer.getTable();
     // _table.addListener(this.updateDisplay);
   }
